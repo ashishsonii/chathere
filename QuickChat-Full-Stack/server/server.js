@@ -48,13 +48,28 @@ io.on("connection", (socket)=>{
 
 // Middleware setup
 app.use(express.json({limit: "4mb"}));
-app.use(cors());
+
+
+app.use(cors({
+  origin: [
+    "https://orry.vercel.app", 
+    "http://localhost:5173"
+  ],
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  credentials: true
+}));
+
+
+
+
 
 
 // Routes setup
 app.use("/api/status", (req, res)=> res.send("Server is live"));
 app.use("/api/auth", userRouter);
 app.use("/api/messages", messageRouter)
+
+
 
 
 // Connect to MongoDB
@@ -65,5 +80,5 @@ if(process.env.NODE_ENV !== "production"){
     server.listen(PORT, ()=> console.log("Server is running on PORT: " + PORT));
 }
 
-// Export server for Vervel
+// Export server for Vercel
 export default server;
