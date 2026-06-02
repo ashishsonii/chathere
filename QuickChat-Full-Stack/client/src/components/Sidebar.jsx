@@ -52,8 +52,15 @@ const Sidebar = () => {
             className={`h-full p-1 rounded-r-xl overflow-y-scroll text-white ${selectedUser ? "max-md:hidden" : ''}`}
         >
             <div className='pb-2'>
-                <div className='flex justify-between items-center'>
-                    <img src={assets.logo} alt="logo" className="w-35 h-auto object-contain drop-shadow-md mx-auto" />
+                <div className='flex justify-between items-center px-2 py-1'>
+                    <div className="flex flex-col select-none">
+                        <h1 className="text-2xl font-bold bg-gradient-to-r from-purple-400 to-indigo-400 bg-clip-text text-transparent">
+                            Orry
+                        </h1>
+                        <span className="text-[9px] text-gray-400 font-medium tracking-wider uppercase">
+                            Chatby Ashish
+                        </span>
+                    </div>
 
                     <div className="relative group">
                         <img src={assets.menu_icon} alt="Menu" className='max-h-5 cursor-pointer' />

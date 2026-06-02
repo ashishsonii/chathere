@@ -186,9 +186,19 @@ const ChatContainer = () => {
             </div>
         </div>
     ) : (
-        <div className='flex-1 flex flex-col items-center justify-center gap-0 text-gray-500 max-md:hidden style={{ backgroundColor: "rgba(255, 255, 255, 0.12)" }}'>
-            <img src={assets.logo_icon} className='w-auto max-w-75' alt="" />
-            <p className='text-lg font-medium text-white'>Chat anytime, anywhere</p>
+        <div 
+            style={{ backgroundColor: "rgba(255, 255, 255, 0.05)" }}
+            className='flex-1 flex flex-col items-center justify-center gap-2 text-gray-500 max-md:hidden'
+        >
+            <div className="flex flex-col items-center gap-1 select-none mb-4">
+                <h1 className="text-6xl font-extrabold tracking-tight bg-gradient-to-r from-purple-400 to-indigo-400 bg-clip-text text-transparent drop-shadow-md">
+                    Orry
+                </h1>
+                <p className="text-gray-400 text-xs tracking-widest uppercase">
+                    Chatby Ashish
+                </p>
+            </div>
+            <p className='text-sm font-medium text-gray-400/80'>Chat anytime, anywhere</p>
             <footer className="flex justify-center items-center text-gray-400 text-[10px] py-4">
                 © {new Date().getFullYear()} Ashish Soni — All rights reserved.
             </footer>

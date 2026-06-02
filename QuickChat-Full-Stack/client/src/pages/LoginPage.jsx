@@ -28,7 +28,14 @@ const LoginPage = () => {
     <div className='min-h-screen bg-cover bg-center flex items-center justify-center gap-0 sm:justify-evenly max-sm:flex-col backdrop-blur-2xl'>
 
       {/* -------- left -------- */}
-      <img src={assets.logo_big} alt="" className='w-[min(45vw,350px)]'/>
+      <div className="flex flex-col items-center sm:items-start gap-1 select-none">
+        <h1 className="text-6xl sm:text-7xl font-extrabold tracking-tight bg-gradient-to-r from-purple-400 via-pink-400 to-indigo-500 bg-clip-text text-transparent drop-shadow-md">
+          Orry
+        </h1>
+        <p className="text-gray-300/80 text-sm sm:text-base font-medium tracking-wider uppercase ml-1">
+          Chatby Ashish
+        </p>
+      </div>
 
       {/* -------- right -------- */}
 
