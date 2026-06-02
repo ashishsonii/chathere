@@ -1,7 +1,8 @@
 import { generateToken } from "../lib/utils.js";
 import User from "../models/User.js";
 import bcrypt from "bcryptjs";
-import cloudinary from "../lib/cloudinary.js"
+import redis from "../lib/redis.js";
+import { uploadToS3 } from "../lib/s3.js";
 
 // Signup a new user
 export const signup = async (req, res)=>{
@@ -69,10 +70,14 @@ export const updateProfile = async (req, res)=>{
         if(!profilePic){
             updatedUser = await User.findByIdAndUpdate(userId, {bio, fullName}, {new: true});
         } else{
-            const upload = await cloudinary.uploader.upload(profilePic);
+            const uploadUrl = await uploadToS3(profilePic);
 
-            updatedUser = await User.findByIdAndUpdate(userId, {profilePic: upload.secure_url, bio, fullName}, {new: true});
+            updatedUser = await User.findByIdAndUpdate(userId, {profilePic: uploadUrl, bio, fullName}, {new: true});
         }
+
+        // Invalidate Redis profile cache to avoid serving stale profile data
+        await redis.del(`user:profile:${userId}`);
+
         res.json({success: true, user: updatedUser})
     } catch (error) {
         console.log(error.message);

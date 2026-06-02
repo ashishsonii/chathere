@@ -2,46 +2,78 @@ import { createContext, useContext, useEffect, useState } from "react";
 import { AuthContext } from "./AuthContext";
 import toast from "react-hot-toast";
 
-
 export const ChatContext = createContext();
 
 export const ChatProvider = ({ children })=>{
 
     const [messages, setMessages] = useState([]);
-    const [users, setUsers] = useState([]);
+    const [conversations, setConversations] = useState([]);
     const [selectedUser, setSelectedUser] = useState(null)
-    const [unseenMessages, setUnseenMessages] = useState({})
+    const [typingStatus, setTypingStatus] = useState({}); // { userId: true/false }
+    
+    // Pagination states
+    const [nextCursor, setNextCursor] = useState(null);
+    const [hasMore, setHasMore] = useState(false);
 
     const {socket, axios} = useContext(AuthContext);
-    const [typingStatus, setTypingStatus] = useState({}); // { userId: true/false }
 
-
-
-
-    // function to get all users for sidebar
-    const getUsers = async () =>{
+    // function to get all active conversations for sidebar
+    const getUsers = async () => {
         try {
             const { data } = await axios.get("/api/messages/users");
             if (data.success) {
-                setUsers(data.users)
-                setUnseenMessages(data.unseenMessages)
+                setConversations(data.conversations)
             }
         } catch (error) {
             toast.error(error.message)
         }
     }
 
-    // function to get messages for selected user
-    const getMessages = async (userId)=>{
+    // function to search registered users to start new chat
+    const searchUsers = async (query) => {
+        try {
+            const { data } = await axios.get(`/api/messages/search?query=${query}`);
+            if (data.success) {
+                return data.users;
+            }
+            return [];
+        } catch (error) {
+            toast.error(error.message);
+            return [];
+        }
+    };
+
+    // function to get first page of messages for selected user
+    const getMessages = async (userId) => {
         try {
             const { data } = await axios.get(`/api/messages/${userId}`);
-            if (data.success){
-                setMessages(data.messages)
+            if (data.success) {
+                setMessages(data.messages);
+                setNextCursor(data.nextCursor);
+                setHasMore(data.hasMore);
+                // Refresh conversations list to clear the unread counter in real-time
+                getUsers();
             }
         } catch (error) {
             toast.error(error.message)
         }
     }
+
+    // function to load more older messages (for scroll-up pagination)
+    const loadMoreMessages = async () => {
+        if (!hasMore || !selectedUser || !nextCursor) return;
+        
+        try {
+            const { data } = await axios.get(`/api/messages/${selectedUser._id}?cursor=${nextCursor}`);
+            if (data.success) {
+                setMessages((prevMessages) => [...data.messages, ...prevMessages]);
+                setNextCursor(data.nextCursor);
+                setHasMore(data.hasMore);
+            }
+        } catch (error) {
+            toast.error(error.message);
+        }
+    };
 
     // function to send message to selected user
     const sendMessage = async (messageData)=>{
@@ -57,7 +89,7 @@ export const ChatProvider = ({ children })=>{
         }
     }
 
-    // function to subscribe to messages for selected user
+    // function to subscribe to new messages for selected user
     const subscribeToMessages = async () =>{
         if(!socket) return;
 
@@ -66,14 +98,8 @@ export const ChatProvider = ({ children })=>{
                 newMessage.seen = true;
                 setMessages((prevMessages)=> [...prevMessages, newMessage]);
                 axios.put(`/api/messages/mark/${newMessage._id}`);
-            }else{
-                setUnseenMessages((prevUnseenMessages)=>({
-                    ...prevUnseenMessages, [newMessage.senderId] : prevUnseenMessages[newMessage.senderId] ? prevUnseenMessages[newMessage.senderId] + 1 : 1
-                }))
             }
         })
-
-        
     }
 
     // function to unsubscribe from messages
@@ -81,40 +107,68 @@ export const ChatProvider = ({ children })=>{
         if(socket) socket.off("newMessage");
     }
 
-   
+    // function to subscribe to real-time conversation updates (sidebar updates)
+    const subscribeToConversationUpdates = () => {
+        if (!socket) return;
 
+        socket.on("conversationUpdate", (updatedConv) => {
+            setConversations((prevConvs) => {
+                const filtered = prevConvs.filter(c => c._id !== updatedConv._id);
+                return [updatedConv, ...filtered];
+            });
+        });
+    };
 
+    // function to unsubscribe from conversation updates
+    const unsubscribeFromConversationUpdates = () => {
+        if (socket) socket.off("conversationUpdate");
+    };
+
+    // subscribe/unsubscribe on component lifecycle
     useEffect(()=>{
         subscribeToMessages();
+        subscribeToConversationUpdates();
         
-        return ()=> unsubscribeFromMessages();
+        return () => {
+            unsubscribeFromMessages();
+            unsubscribeFromConversationUpdates();
+        };
     },[socket, selectedUser])
 
+    const subscribeToTyping = () => {
+        if (!socket) return;
 
-     const subscribeToTyping = () => {
-  if (!socket) return;
+        socket.on("typing", ({ fromUserId, typing }) => {
+            setTypingStatus((prev) => ({ ...prev, [fromUserId]: typing }));
+        });
+    };
 
-  socket.on("typing", ({ fromUserId, typing }) => {
-    setTypingStatus((prev) => ({ ...prev, [fromUserId]: typing }));
-  });
-};
+    const unsubscribeFromTyping = () => {
+        if (socket) socket.off("typing");
+    };
 
-const unsubscribeFromTyping = () => {
-  if (socket) socket.off("typing");
-};
     useEffect(() => {
-    subscribeToTyping();
-     return () => unsubscribeFromTyping();
-}, [socket]);
-
+        subscribeToTyping();
+        return () => unsubscribeFromTyping();
+    }, [socket]);
 
     const value = {
-        messages, users, selectedUser, getUsers, getMessages, sendMessage, setSelectedUser, unseenMessages, typingStatus,setUnseenMessages
+        messages, 
+        conversations, 
+        selectedUser, 
+        getUsers, 
+        getMessages, 
+        sendMessage, 
+        setSelectedUser, 
+        typingStatus,
+        searchUsers,
+        hasMore,
+        loadMoreMessages
     }
 
     return (
-    <ChatContext.Provider value={value}>
+        <ChatContext.Provider value={value}>
             { children }
-    </ChatContext.Provider>
+        </ChatContext.Provider>
     )
 }

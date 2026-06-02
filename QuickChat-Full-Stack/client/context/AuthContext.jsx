@@ -19,13 +19,15 @@ export const AuthProvider = ({ children })=>{
     // Check if user is authenticated and if so, set the user data and connect the socket
     const checkAuth = async () => {
         try {
+            const storedToken = localStorage.getItem("token");
+            if (!storedToken) return;
             const { data } = await axios.get("/api/auth/check");
             if (data.success) {
                 setAuthUser(data.user)
                 connectSocket(data.user)
             }
         } catch (error) {
-            toast.error(error.message)
+            console.log("Auth check failed:", error.message);
         }
     }
 
@@ -35,11 +37,12 @@ const login = async (state, credentials)=>{
     try {
         const { data } = await axios.post(`/api/auth/${state}`, credentials);
         if (data.success){
-            setAuthUser(data.userData);
-            connectSocket(data.userData);
+            // Set token FIRST so downstream components can make authenticated requests
             axios.defaults.headers.common["token"] = data.token;
             setToken(data.token);
             localStorage.setItem("token", data.token)
+            setAuthUser(data.userData);
+            connectSocket(data.userData);
             toast.success(data.message)
         }else{
             toast.error(data.message)
