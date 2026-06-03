@@ -1,7 +1,7 @@
 import Message from "../models/Message.js";
 import User from "../models/User.js";
 import Conversation from "../models/Conversation.js";
-import { io, userSocketMap } from "../server.js";
+import { io } from "../server.js";
 import { uploadToS3, signUser, signMessage } from "../lib/s3.js";
 
 // Helper to find or create a conversation between two users
@@ -167,11 +167,8 @@ export const sendMessage = async (req, res) => {
 
         const signedNewMessage = await signMessage(newMessage);
 
-        // Emit the new message to the receiver's socket
-        const receiverSocketId = userSocketMap[receiverId];
-        if (receiverSocketId) {
-            io.to(receiverSocketId).emit("newMessage", signedNewMessage);
-        }
+        // Emit the new message to the receiver's room (real-time clustered delivery)
+        io.to(receiverId.toString()).emit("newMessage", signedNewMessage);
 
         // Emit general conversation update to both participants so sidebars update instantly
         const updatedConv = await Conversation.findById(conv._id)
@@ -188,10 +185,7 @@ export const sendMessage = async (req, res) => {
             }
 
             [senderId, receiverId].forEach(pId => {
-                const socketId = userSocketMap[pId.toString()];
-                if (socketId) {
-                    io.to(socketId).emit("conversationUpdate", convObj);
-                }
+                io.to(pId.toString()).emit("conversationUpdate", convObj);
             });
         }
 

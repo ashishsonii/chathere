@@ -40,6 +40,7 @@ io.on("connection", async (socket)=>{
     console.log("User Connected", userId);
 
     if(userId) {
+        socket.join(userId.toString());
         userSocketMap[userId] = socket.id;
         await redis.sadd("online_users", userId);
     }
@@ -59,14 +60,11 @@ io.on("connection", async (socket)=>{
     })
 
     // Typing event
-  socket.on("typing", ({ toUserId, typing }) => {
-    const receiverSocketId = userSocketMap[toUserId];
-    if (receiverSocketId) {
-      io.to(receiverSocketId).emit("typing", { fromUserId: userId, typing });
-    }
-  });
-
-  
+    socket.on("typing", ({ toUserId, typing }) => {
+        if (toUserId) {
+            io.to(toUserId.toString()).emit("typing", { fromUserId: userId, typing });
+        }
+    });
 })
 
 // Middleware setup
