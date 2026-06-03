@@ -9,14 +9,37 @@ export const ChatProvider = ({ children })=>{
     const [messages, setMessages] = useState([]);
     const [conversations, setConversations] = useState([]);
     const [friends, setFriends] = useState([]);
-    const [selectedUser, setSelectedUser] = useState(null)
+    const [selectedUser, setSelectedUser] = useState(() => {
+        const stored = localStorage.getItem("selectedUser");
+        try {
+            return stored ? JSON.parse(stored) : null;
+        } catch (e) {
+            return null;
+        }
+    });
     const [typingStatus, setTypingStatus] = useState({}); // { userId: true/false }
     
     // Pagination states
     const [nextCursor, setNextCursor] = useState(null);
     const [hasMore, setHasMore] = useState(false);
 
-    const {socket, axios} = useContext(AuthContext);
+    const {socket, axios, authUser} = useContext(AuthContext);
+
+    // Sync selectedUser with localStorage and reset when user logs out
+    useEffect(() => {
+        if (selectedUser) {
+            localStorage.setItem("selectedUser", JSON.stringify(selectedUser));
+        } else {
+            localStorage.removeItem("selectedUser");
+        }
+    }, [selectedUser]);
+
+    useEffect(() => {
+        if (!authUser) {
+            setSelectedUser(null);
+            localStorage.removeItem("selectedUser");
+        }
+    }, [authUser]);
 
     // function to get all active conversations and friend list for sidebar
     const getUsers = async () => {
@@ -177,7 +200,6 @@ export const ChatProvider = ({ children })=>{
     const value = {
         messages, 
         conversations, 
-        allUsers,
         selectedUser, 
         getUsers, 
         getMessages, 
