@@ -2,7 +2,7 @@ import { generateToken } from "../lib/utils.js";
 import User from "../models/User.js";
 import bcrypt from "bcryptjs";
 import redis from "../lib/redis.js";
-import { uploadToS3 } from "../lib/s3.js";
+import { uploadToS3, signUser } from "../lib/s3.js";
 
 // Signup a new user
 export const signup = async (req, res)=>{
@@ -27,7 +27,8 @@ export const signup = async (req, res)=>{
 
         const token = generateToken(newUser._id)
 
-        res.json({success: true, userData: newUser, token, message: "Account created successfully"})
+        const signedUser = await signUser(newUser);
+        res.json({success: true, userData: signedUser, token, message: "Account created successfully"})
     } catch (error) {
         console.log(error.message);
         res.json({success: false, message: error.message})
@@ -48,15 +49,17 @@ export const login = async (req, res) =>{
 
         const token = generateToken(userData._id)
 
-        res.json({success: true, userData, token, message: "Login successful"})
+        const signedUser = await signUser(userData);
+        res.json({success: true, userData: signedUser, token, message: "Login successful"})
     } catch (error) {
         console.log(error.message);
         res.json({success: false, message: error.message})
     }
 }
 // Controller to check if user is authenticated
-export const checkAuth = (req, res)=>{
-    res.json({success: true, user: req.user});
+export const checkAuth = async (req, res)=>{
+    const signedUser = await signUser(req.user);
+    res.json({success: true, user: signedUser});
 }
 
 // Controller to update user profile details
@@ -78,7 +81,8 @@ export const updateProfile = async (req, res)=>{
         // Invalidate Redis profile cache to avoid serving stale profile data
         await redis.del(`user:profile:${userId}`);
 
-        res.json({success: true, user: updatedUser})
+        const signedUser = await signUser(updatedUser);
+        res.json({success: true, user: signedUser})
     } catch (error) {
         console.log(error.message);
         res.json({success: false, message: error.message})

@@ -8,6 +8,7 @@ export const ChatProvider = ({ children })=>{
 
     const [messages, setMessages] = useState([]);
     const [conversations, setConversations] = useState([]);
+    const [friends, setFriends] = useState([]);
     const [selectedUser, setSelectedUser] = useState(null)
     const [typingStatus, setTypingStatus] = useState({}); // { userId: true/false }
     
@@ -17,17 +18,38 @@ export const ChatProvider = ({ children })=>{
 
     const {socket, axios} = useContext(AuthContext);
 
-    // function to get all active conversations for sidebar
+    // function to get all active conversations and friend list for sidebar
     const getUsers = async () => {
         try {
             const { data } = await axios.get("/api/messages/users");
             if (data.success) {
                 setConversations(data.conversations)
             }
+
+            const friendsRes = await axios.get("/api/messages/friends");
+            if (friendsRes.data.success) {
+                setFriends(friendsRes.data.friends);
+            }
         } catch (error) {
             toast.error(error.message)
         }
     }
+
+    // function to add a friend
+    const addFriend = async (friendId) => {
+        try {
+            const { data } = await axios.post("/api/messages/add-friend", { friendId });
+            if (data.success) {
+                toast.success(data.message);
+                // Refresh both the friends list and sidebar conversations
+                getUsers();
+            } else {
+                toast.error(data.message);
+            }
+        } catch (error) {
+            toast.error(error.message);
+        }
+    };
 
     // function to search registered users to start new chat
     const searchUsers = async (query) => {
@@ -155,6 +177,7 @@ export const ChatProvider = ({ children })=>{
     const value = {
         messages, 
         conversations, 
+        allUsers,
         selectedUser, 
         getUsers, 
         getMessages, 

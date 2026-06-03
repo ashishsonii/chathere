@@ -9,6 +9,7 @@ const Sidebar = () => {
     const {
         getUsers, 
         conversations, 
+        allUsers,
         selectedUser, 
         setSelectedUser,
         searchUsers
@@ -19,6 +20,7 @@ const Sidebar = () => {
     const [input, setInput] = useState("")
     const [searchResults, setSearchResults] = useState([])
     const [isSearching, setIsSearching] = useState(false)
+    const [activeTab, setActiveTab] = useState("chats"); // "chats" or "friends"
 
     const navigate = useNavigate();
 
@@ -111,59 +113,123 @@ const Sidebar = () => {
                         )}
                     </>
                 ) : (
-                    // Conversation Mode: Show active conversations
+                    // Conversation Mode: Show active conversations or Friends list
                     <>
-                        <p className='text-xs text-gray-400 px-3 py-1 font-semibold uppercase tracking-wider'>Recent Chats</p>
-                        {conversations.length > 0 ? (
-                            conversations.map((conv, index) => {
-                                const otherParticipant = conv.participants.find(p => p._id !== authUser?._id) || authUser;
-                                if (!otherParticipant) return null;
-                                
-                                const isSelected = selectedUser?._id === otherParticipant._id;
-                                const unreadCount = conv.unreadMessages?.[authUser?._id] || 0;
-                                const lastMsg = conv.lastMessage;
-                                
-                                let lastMsgText = "";
-                                if (lastMsg) {
-                                    if (lastMsg.image) {
-                                        lastMsgText = "📷 Image";
-                                    } else {
-                                        lastMsgText = lastMsg.text;
-                                    }
-                                }
+                        <div className='flex gap-2 px-2 py-1 mb-2 border-b border-gray-700/20 shrink-0 select-none'>
+                            <button
+                                onClick={() => setActiveTab("chats")}
+                                className={`flex-1 py-1.5 text-xs font-semibold rounded-md transition-all ${
+                                    activeTab === "chats"
+                                        ? "bg-violet-600 text-white shadow-sm"
+                                        : "bg-transparent text-gray-400 hover:text-white"
+                                }`}
+                            >
+                                Chats
+                            </button>
+                            <button
+                                onClick={() => setActiveTab("friends")}
+                                className={`flex-1 py-1.5 text-xs font-semibold rounded-md transition-all ${
+                                    activeTab === "friends"
+                                        ? "bg-violet-600 text-white shadow-sm"
+                                        : "bg-transparent text-gray-400 hover:text-white"
+                                }`}
+                            >
+                                Friends ({allUsers.length})
+                            </button>
+                        </div>
 
-                                return (
-                                    <div 
-                                        onClick={() => setSelectedUser(otherParticipant)}
-                                        key={conv._id} 
-                                        className={`relative flex items-center gap-2 p-2 pl-4 rounded cursor-pointer max-sm:text-sm transition-all ${isSelected ? 'bg-[#282142]/50 border-l-4 border-violet-500' : 'hover:bg-[#282142]/20'}`}
-                                    >
-                                        <img src={otherParticipant?.profilePic || assets.avatar_icon} alt="" className='w-[35px] aspect-[1/1] rounded-full' />
-                                        <div className='flex flex-col leading-5 flex-1 min-w-0'>
-                                            <div className='flex justify-between items-center gap-2'>
-                                                <p className='truncate font-medium'>{otherParticipant.fullName}</p>
-                                                {onlineUsers.includes(otherParticipant._id) ? (
-                                                    <span className='w-2 h-2 rounded-full bg-green-400 shrink-0'></span>
-                                                ) : (
-                                                    <span className='w-2 h-2 rounded-full bg-neutral-500 shrink-0'></span>
+                        {activeTab === "chats" ? (
+                            <>
+                                <p className='text-xs text-gray-400 px-3 py-1 font-semibold uppercase tracking-wider'>Recent Chats</p>
+                                {conversations.length > 0 ? (
+                                    conversations.map((conv, index) => {
+                                        const otherParticipant = conv.participants.find(p => p._id !== authUser?._id) || authUser;
+                                        if (!otherParticipant) return null;
+                                        
+                                        const isSelected = selectedUser?._id === otherParticipant._id;
+                                        const unreadCount = conv.unreadMessages?.[authUser?._id] || 0;
+                                        const lastMsg = conv.lastMessage;
+                                        
+                                        let lastMsgText = "";
+                                        if (lastMsg) {
+                                            if (lastMsg.image) {
+                                                lastMsgText = "📷 Image";
+                                            } else {
+                                                lastMsgText = lastMsg.text;
+                                            }
+                                        }
+
+                                        return (
+                                            <div 
+                                                onClick={() => setSelectedUser(otherParticipant)}
+                                                key={conv._id} 
+                                                className={`relative flex items-center gap-2 p-2 pl-4 rounded cursor-pointer max-sm:text-sm transition-all ${isSelected ? 'bg-[#282142]/50 border-l-4 border-violet-500' : 'hover:bg-[#282142]/20'}`}
+                                            >
+                                                <img src={otherParticipant?.profilePic || assets.avatar_icon} alt="" className='w-[35px] aspect-[1/1] rounded-full' />
+                                                <div className='flex flex-col leading-5 flex-1 min-w-0'>
+                                                    <div className='flex justify-between items-center gap-2'>
+                                                        <p className='truncate font-medium'>{otherParticipant.fullName}</p>
+                                                        {onlineUsers.includes(otherParticipant._id) ? (
+                                                            <span className='w-2 h-2 rounded-full bg-green-400 shrink-0'></span>
+                                                        ) : (
+                                                            <span className='w-2 h-2 rounded-full bg-neutral-500 shrink-0'></span>
+                                                        )}
+                                                    </div>
+                                                    <p className={`text-xs truncate ${unreadCount > 0 ? 'text-violet-300 font-medium' : 'text-neutral-400'}`}>
+                                                        {lastMsgText || otherParticipant.bio || "No recent messages"}
+                                                    </p>
+                                                </div>
+                                                {unreadCount > 0 && (
+                                                    <p className='absolute top-1/2 right-4 -translate-y-1/2 text-[10px] h-5 w-5 flex justify-center items-center rounded-full bg-violet-600 font-bold shadow-md'>
+                                                        {unreadCount}
+                                                    </p>
                                                 )}
                                             </div>
-                                            <p className={`text-xs truncate ${unreadCount > 0 ? 'text-violet-300 font-medium' : 'text-neutral-400'}`}>
-                                                {lastMsgText || otherParticipant.bio || "No recent messages"}
-                                            </p>
-                                        </div>
-                                        {unreadCount > 0 && (
-                                            <p className='absolute top-1/2 right-4 -translate-y-1/2 text-[10px] h-5 w-5 flex justify-center items-center rounded-full bg-violet-600 font-bold shadow-md'>
-                                                {unreadCount}
-                                            </p>
-                                        )}
-                                    </div>
-                                );
-                            })
+                                        );
+                                    })
+                                ) : (
+                                    <p className='text-xs text-gray-500 text-center py-6 px-4'>
+                                        No recent chats. Use search or check Friends to start a conversation!
+                                    </p>
+                                )}
+                            </>
                         ) : (
-                            <p className='text-xs text-gray-500 text-center py-6 px-4'>
-                                No recent chats. Use search above to start a conversation!
-                            </p>
+                            <>
+                                <p className='text-xs text-gray-400 px-3 py-1 font-semibold uppercase tracking-wider'>All Registered Users</p>
+                                {allUsers.length > 0 ? (
+                                    allUsers.map((user) => {
+                                        const isSelected = selectedUser?._id === user._id;
+                                        const isOnline = onlineUsers.includes(user._id);
+
+                                        return (
+                                            <div 
+                                                onClick={() => setSelectedUser(user)}
+                                                key={user._id} 
+                                                className={`relative flex items-center gap-2 p-2 pl-4 rounded cursor-pointer max-sm:text-sm transition-all ${isSelected ? 'bg-[#282142]/50 border-l-4 border-violet-500' : 'hover:bg-[#282142]/20'}`}
+                                            >
+                                                <img src={user?.profilePic || assets.avatar_icon} alt="" className='w-[35px] aspect-[1/1] rounded-full' />
+                                                <div className='flex flex-col leading-5 flex-1 min-w-0'>
+                                                    <div className='flex justify-between items-center gap-2'>
+                                                        <p className='truncate font-medium'>{user.fullName}</p>
+                                                        {isOnline ? (
+                                                            <span className='w-2 h-2 rounded-full bg-green-400 shrink-0'></span>
+                                                        ) : (
+                                                            <span className='w-2 h-2 rounded-full bg-neutral-500 shrink-0'></span>
+                                                        )}
+                                                    </div>
+                                                    <p className='text-xs truncate text-neutral-400'>
+                                                        {user.bio || "Hi, I am using Orry!"}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        );
+                                    })
+                                ) : (
+                                    <p className='text-xs text-gray-500 text-center py-6 px-4'>
+                                        No other registered users found.
+                                    </p>
+                                )}
+                            </>
                         )}
                     </>
                 )}
