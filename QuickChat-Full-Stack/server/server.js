@@ -13,10 +13,23 @@ import redis from "./lib/redis.js";
 const app = express();
 const server = http.createServer(app)
 
+import { createAdapter } from "@socket.io/redis-adapter";
+import Redis from "ioredis";
+
 // Initialize socket.io server
 export const io = new Server(server, {
     cors: {origin: "*"}
-})
+});
+
+// Configure Redis adapter for Socket.io clustering
+const pubClient = new Redis(process.env.REDIS_URL);
+const subClient = new Redis(process.env.REDIS_URL);
+
+pubClient.on("error", (err) => console.error("Socket.io Redis PubClient Error:", err.message));
+subClient.on("error", (err) => console.error("Socket.io Redis SubClient Error:", err.message));
+
+io.adapter(createAdapter(pubClient, subClient));
+
 
 // Store online users
 export const userSocketMap = {}; // { userId: socketId }
