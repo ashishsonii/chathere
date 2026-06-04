@@ -208,7 +208,8 @@ export const ChatProvider = ({ children })=>{
         typingStatus,
         searchUsers,
         hasMore,
-        loadMoreMessages
+        loadMoreMessages,
+        friends
     }
 
     return (

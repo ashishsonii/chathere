@@ -9,7 +9,7 @@ const Sidebar = () => {
     const {
         getUsers, 
         conversations, 
-        allUsers,
+        friends,
         selectedUser, 
         setSelectedUser,
         searchUsers
@@ -134,7 +134,7 @@ const Sidebar = () => {
                                         : "bg-transparent text-gray-400 hover:text-white"
                                 }`}
                             >
-                                Friends ({allUsers.length})
+                                Friends ({friends.length})
                             </button>
                         </div>
 
@@ -196,8 +196,8 @@ const Sidebar = () => {
                         ) : (
                             <>
                                 <p className='text-xs text-gray-400 px-3 py-1 font-semibold uppercase tracking-wider'>All Registered Users</p>
-                                {allUsers.length > 0 ? (
-                                    allUsers.map((user) => {
+                                {friends.length > 0 ? (
+                                    friends.map((user) => {
                                         const isSelected = selectedUser?._id === user._id;
                                         const isOnline = onlineUsers.includes(user._id);
 
