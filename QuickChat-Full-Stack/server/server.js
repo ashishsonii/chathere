@@ -1,13 +1,17 @@
 import express from "express";
 import "dotenv/config";
+console.log("DEBUG: REDIS_URL =", process.env.REDIS_URL);
+console.log("DEBUG: MONGODB_URI =", process.env.MONGODB_URI);
 import cors from "cors";
 import http from "http";
 import { connectDB } from "./lib/db.js";
 import userRouter from "./routes/userRoutes.js";
 import messageRouter from "./routes/messageRoutes.js";
+import callRoutes from "./routes/callRoutes.js";
 import { Server } from "socket.io";
 import { runMigration } from "./lib/migrate.js";
 import redis from "./lib/redis.js";
+import { setupCallSignaling } from "./services/callSignaling.js";
 
 // Create Express app and HTTP server
 const app = express();
@@ -18,7 +22,14 @@ import Redis from "ioredis";
 
 // Initialize socket.io server
 export const io = new Server(server, {
-    cors: {origin: "*"}
+  cors: {
+    origin: [
+      "https://chatbyashish.duckdns.org",
+      "https://orry.vercel.app",
+      "http://localhost:5173"
+    ],
+    credentials: true
+  }
 });
 
 // Configure Redis adapter for Socket.io clustering
@@ -44,6 +55,9 @@ io.on("connection", async (socket)=>{
         userSocketMap[userId] = socket.id;
         await redis.sadd("online_users", userId);
     }
+    
+    // Setup WebRTC Call Signaling
+    setupCallSignaling(io, socket, userSocketMap);
     
     // Fetch and broadcast online users from Redis Set
     const onlineUsers = await redis.smembers("online_users");
@@ -73,8 +87,9 @@ app.use(express.json({limit: "4mb"}));
 
 app.use(cors({
   origin: [
-    "https://orry.vercel.app", 
-    "http://localhost:5173"
+    "https://orry.vercel.app",
+    "http://localhost:5173",
+    "https://chatbyashish.duckdns.org"
   ],
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
   credentials: true
@@ -88,7 +103,8 @@ app.use(cors({
 // Routes setup
 app.use("/api/status", (req, res)=> res.send("Server is live"));
 app.use("/api/auth", userRouter);
-app.use("/api/messages", messageRouter)
+app.use("/api/messages", messageRouter);
+app.use("/api/calls", callRoutes);
 
 
 

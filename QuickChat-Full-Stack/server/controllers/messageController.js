@@ -76,6 +76,7 @@ export const searchUsers = async (req, res) => {
         }).select("-password");
 
         const signedUsers = await Promise.all(users.map(signUser));
+        console.log("Search Query:", query, "Found Users:", signedUsers.length);
         res.json({ success: true, users: signedUsers });
     } catch (error) {
         console.log(error.message);

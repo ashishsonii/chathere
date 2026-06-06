@@ -3,6 +3,7 @@ import assets from '../assets/assets'
 import { useNavigate } from 'react-router-dom';
 import { AuthContext } from '../../context/AuthContext';
 import { ChatContext } from '../../context/ChatContext';
+import CallHistory from './call/CallHistory';
 
 const Sidebar = () => {
 
@@ -134,7 +135,17 @@ const Sidebar = () => {
                                         : "bg-transparent text-gray-400 hover:text-white"
                                 }`}
                             >
-                                Friends ({friends.length})
+                                Friends
+                            </button>
+                            <button
+                                onClick={() => setActiveTab("calls")}
+                                className={`flex-1 py-1.5 text-xs font-semibold rounded-md transition-all ${
+                                    activeTab === "calls"
+                                        ? "bg-violet-600 text-white shadow-sm"
+                                        : "bg-transparent text-gray-400 hover:text-white"
+                                }`}
+                            >
+                                Calls
                             </button>
                         </div>
 
@@ -193,7 +204,7 @@ const Sidebar = () => {
                                     </p>
                                 )}
                             </>
-                        ) : (
+                        ) : activeTab === "friends" ? (
                             <>
                                 <p className='text-xs text-gray-400 px-3 py-1 font-semibold uppercase tracking-wider'>All Registered Users</p>
                                 {friends.length > 0 ? (
@@ -229,6 +240,11 @@ const Sidebar = () => {
                                         No other registered users found.
                                     </p>
                                 )}
+                            </>
+                        ) : (
+                            <>
+                                <p className='text-xs text-gray-400 px-3 py-1 font-semibold uppercase tracking-wider'>Call History</p>
+                                <CallHistory />
                             </>
                         )}
                     </>
