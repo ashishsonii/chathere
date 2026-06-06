@@ -1,5 +1,6 @@
 import Call from "../models/Call.js";
 import { signUser } from "../lib/s3.js";
+import crypto from "crypto";
 
 // Get user's call history
 export const getCallHistory = async (req, res) => {
@@ -86,6 +87,43 @@ export const getCallDetails = async (req, res) => {
         res.json({ success: true, call: callObj });
     } catch (error) {
         console.error("Error fetching call details:", error.message);
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
+// Generate TURN REST API credentials
+export const getTurnCredentials = (req, res) => {
+    try {
+        const turnSecret = process.env.TURN_SECRET;
+        const turnServerUrl = process.env.TURN_SERVER_URL;
+
+        if (!turnSecret || !turnServerUrl) {
+            return res.status(500).json({ 
+                success: false, 
+                message: "TURN server is not configured." 
+            });
+        }
+
+        // Credentials are valid for 86400 seconds (24 hours)
+        const ttl = 86400;
+        const timestamp = Math.floor(Date.now() / 1000) + ttl;
+        const username = `${timestamp}:${req.user._id}`;
+        
+        // Generate HMAC-SHA1 signature
+        const hmac = crypto.createHmac("sha1", turnSecret);
+        hmac.update(username);
+        const password = hmac.digest("base64");
+
+        res.json({
+            success: true,
+            credentials: {
+                urls: turnServerUrl,
+                username,
+                credential: password
+            }
+        });
+    } catch (error) {
+        console.error("Error generating TURN credentials:", error.message);
         res.status(500).json({ success: false, message: error.message });
     }
 };

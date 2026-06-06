@@ -7,7 +7,7 @@ const ICE_SERVERS = {
     ]
 };
 
-export const useWebRTC = (socket, userId) => {
+export const useWebRTC = (socket, userId, axios) => {
     const [localStream, setLocalStream] = useState(null);
     const [remoteStream, setRemoteStream] = useState(null);
     const [isMuted, setIsMuted] = useState(false);
@@ -17,12 +17,29 @@ export const useWebRTC = (socket, userId) => {
     const pendingCandidates = useRef([]); // Buffer for ICE candidates received before answer
 
     // Initialize RTCPeerConnection
-    const initPeerConnection = useCallback((callId, remoteUserId, isInitiator) => {
+    const initPeerConnection = useCallback(async (callId, remoteUserId, isInitiator) => {
         if (peerConnection.current) {
             peerConnection.current.close();
         }
 
-        const pc = new RTCPeerConnection(ICE_SERVERS);
+        let iceServersConfig = ICE_SERVERS;
+        try {
+            if (axios) {
+                const { data } = await axios.get("/api/calls/turn-credentials");
+                if (data.success && data.credentials) {
+                    iceServersConfig = {
+                        iceServers: [
+                            ...ICE_SERVERS.iceServers,
+                            data.credentials
+                        ]
+                    };
+                }
+            }
+        } catch (error) {
+            console.error("Failed to fetch TURN credentials, falling back to STUN", error);
+        }
+
+        const pc = new RTCPeerConnection(iceServersConfig);
         peerConnection.current = pc;
 
         // 1. Handle local ICE candidates
@@ -49,7 +66,7 @@ export const useWebRTC = (socket, userId) => {
         }
 
         return pc;
-    }, [localStream, socket]);
+    }, [localStream, socket, axios]);
 
     // Create an offer (Caller)
     const createOffer = async (callId, remoteUserId) => {

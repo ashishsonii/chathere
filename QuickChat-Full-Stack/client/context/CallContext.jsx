@@ -29,7 +29,7 @@ export const CallProvider = ({ children }) => {
         toggleMute,
         toggleCamera,
         cleanup: cleanupWebRTC
-    } = useWebRTC(socket, authUser?._id);
+    } = useWebRTC(socket, authUser?._id, axios);
 
     const timerRef = useRef(null);
     const timeoutRef = useRef(null); // 30s ring timeout
@@ -77,7 +77,7 @@ export const CallProvider = ({ children }) => {
             socket.emit("call:accept", { callId: currentCall.callId });
             
             // 2. Initialize PeerConnection as receiver (not initiator)
-            initPeerConnection(currentCall.callId, currentCall.callerId, false);
+            await initPeerConnection(currentCall.callId, currentCall.callerId, false);
             
             startDurationTimer();
         } catch (error) {
@@ -148,7 +148,7 @@ export const CallProvider = ({ children }) => {
             startDurationTimer();
             
             // Initialize PeerConnection as Caller and send Offer
-            initPeerConnection(callId, currentCall.receiverId, true);
+            await initPeerConnection(callId, currentCall.receiverId, true);
             await createOffer(callId, currentCall.receiverId);
         });
 
