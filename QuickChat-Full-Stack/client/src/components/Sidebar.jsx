@@ -22,6 +22,7 @@ const Sidebar = () => {
     const [searchResults, setSearchResults] = useState([])
     const [isSearching, setIsSearching] = useState(false)
     const [activeTab, setActiveTab] = useState("chats"); // "chats" or "friends"
+    const [isMenuOpen, setIsMenuOpen] = useState(false);
 
     const navigate = useNavigate();
 
@@ -65,13 +66,20 @@ const Sidebar = () => {
                         </span>
                     </div>
 
-                    <div className="relative group">
-                        <img src={assets.menu_icon} alt="Menu" className='max-h-5 cursor-pointer' />
-                        <div className='absolute top-full right-0 z-20 w-32 p-5 rounded-md bg-[#282142] border border-gray-600 text-gray-100 hidden group-hover:block'>
-                            <p onClick={() => navigate('/profile')} className='cursor-pointer text-sm'>Edit Profile</p>
-                            <hr className="my-2 border-t border-gray-500" />
-                            <p onClick={() => logout()} className='cursor-pointer text-sm'>Logout</p>
-                        </div>
+                    <div className="relative">
+                        <img 
+                            onClick={() => setIsMenuOpen(!isMenuOpen)} 
+                            src={assets.menu_icon} 
+                            alt="Menu" 
+                            className='max-h-5 cursor-pointer' 
+                        />
+                        {isMenuOpen && (
+                            <div className='absolute top-full right-0 z-20 w-32 p-5 rounded-md bg-[#282142] border border-gray-600 text-gray-100'>
+                                <p onClick={() => { navigate('/profile'); setIsMenuOpen(false); }} className='cursor-pointer text-sm'>Edit Profile</p>
+                                <hr className="my-2 border-t border-gray-500" />
+                                <p onClick={() => logout()} className='cursor-pointer text-sm'>Logout</p>
+                            </div>
+                        )}
                     </div>
                 </div>
 
