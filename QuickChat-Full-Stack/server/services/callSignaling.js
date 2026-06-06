@@ -11,8 +11,8 @@ export const setupCallSignaling = (io, socket, userSocketMap) => {
     socket.on("call:initiate", async ({ receiverId, type }) => {
         try {
             // Check if receiver is online
-            const receiverSocketId = userSocketMap[receiverId];
-            if (!receiverSocketId) {
+            const isOnline = await redis.sismember("online_users", receiverId);
+            if (!isOnline) {
                 return socket.emit("call:error", { message: "User is offline" });
             }
 
@@ -39,7 +39,7 @@ export const setupCallSignaling = (io, socket, userSocketMap) => {
             await redis.setex(`call:user:${receiverId}`, 300, callId);
 
             // Emit incoming call to receiver
-            io.to(receiverSocketId).emit("call:incoming", {
+            io.to(receiverId.toString()).emit("call:incoming", {
                 callId,
                 callerId: userId,
                 type
@@ -67,10 +67,7 @@ export const setupCallSignaling = (io, socket, userSocketMap) => {
             callState.answeredAt = Date.now();
             await redis.setex(`call:active:${callId}`, 86400, JSON.stringify(callState)); // Extend TTL while active
 
-            const callerSocketId = userSocketMap[callState.callerId];
-            if (callerSocketId) {
-                io.to(callerSocketId).emit("call:accepted", { callId });
-            }
+            io.to(callState.callerId.toString()).emit("call:accepted", { callId });
         } catch (error) {
             console.error("Error accepting call:", error);
         }
@@ -100,10 +97,7 @@ export const setupCallSignaling = (io, socket, userSocketMap) => {
                 endedAt: Date.now()
             });
 
-            const callerSocketId = userSocketMap[callState.callerId];
-            if (callerSocketId) {
-                io.to(callerSocketId).emit("call:rejected", { callId });
-            }
+            io.to(callState.callerId.toString()).emit("call:rejected", { callId });
         } catch (error) {
             console.error("Error rejecting call:", error);
         }
@@ -119,7 +113,6 @@ export const setupCallSignaling = (io, socket, userSocketMap) => {
             
             // Determine the other user
             const otherUserId = callState.callerId === userId ? callState.receiverId : callState.callerId;
-            const otherSocketId = userSocketMap[otherUserId];
 
             // Clean up Redis
             await redis.del(`call:active:${callId}`);
@@ -141,9 +134,7 @@ export const setupCallSignaling = (io, socket, userSocketMap) => {
             });
 
             // Notify other user
-            if (otherSocketId) {
-                io.to(otherSocketId).emit("call:ended", { callId });
-            }
+            io.to(otherUserId.toString()).emit("call:ended", { callId });
         } catch (error) {
             console.error("Error ending call:", error);
         }
@@ -151,33 +142,21 @@ export const setupCallSignaling = (io, socket, userSocketMap) => {
 
     // 5. WebRTC Signaling: SDP Offer
     socket.on("call:sdp-offer", ({ callId, to, offer }) => {
-        const toSocketId = userSocketMap[to];
-        if (toSocketId) {
-            io.to(toSocketId).emit("call:sdp-offer", { callId, from: userId, offer });
-        }
+        io.to(to.toString()).emit("call:sdp-offer", { callId, from: userId, offer });
     });
 
     // 6. WebRTC Signaling: SDP Answer
     socket.on("call:sdp-answer", ({ callId, to, answer }) => {
-        const toSocketId = userSocketMap[to];
-        if (toSocketId) {
-            io.to(toSocketId).emit("call:sdp-answer", { callId, from: userId, answer });
-        }
+        io.to(to.toString()).emit("call:sdp-answer", { callId, from: userId, answer });
     });
 
     // 7. WebRTC Signaling: ICE Candidate
     socket.on("call:ice-candidate", ({ callId, to, candidate }) => {
-        const toSocketId = userSocketMap[to];
-        if (toSocketId) {
-            io.to(toSocketId).emit("call:ice-candidate", { callId, from: userId, candidate });
-        }
+        io.to(to.toString()).emit("call:ice-candidate", { callId, from: userId, candidate });
     });
 
     // 8. Media Toggle Notifications (Mute/Camera off)
     socket.on("call:toggle-media", ({ callId, to, mediaType, isEnabled }) => {
-        const toSocketId = userSocketMap[to];
-        if (toSocketId) {
-            io.to(toSocketId).emit("call:media-toggled", { callId, from: userId, mediaType, isEnabled });
-        }
+        io.to(to.toString()).emit("call:media-toggled", { callId, from: userId, mediaType, isEnabled });
     });
 };
