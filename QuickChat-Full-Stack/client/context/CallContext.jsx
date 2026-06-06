@@ -103,6 +103,26 @@ export const CallProvider = ({ children }) => {
         cleanupCall();
     };
 
+    // --- Helpers ---
+
+    const cleanupCall = useCallback(() => {
+        stopRingtone();
+        stopRingback();
+        clearTimeout(timeoutRef.current);
+        clearInterval(timerRef.current);
+        cleanupWebRTC();
+        setCallState("idle");
+        setCurrentCall(null);
+        setCallDuration(0);
+    }, [cleanupWebRTC, stopRingtone, stopRingback]);
+
+    const startDurationTimer = () => {
+        setCallDuration(0);
+        timerRef.current = setInterval(() => {
+            setCallDuration(prev => prev + 1);
+        }, 1000);
+    };
+
     // --- Socket Listeners ---
 
     const callStateRef = useRef(callState);
@@ -208,25 +228,6 @@ export const CallProvider = ({ children }) => {
         };
     }, [socket, authUser, initPeerConnection, createOffer, createAnswer, handleAnswer, handleIceCandidate, stopRingback, playRingtone, cleanupCall]);
 
-    // --- Helpers ---
-
-    const cleanupCall = useCallback(() => {
-        stopRingtone();
-        stopRingback();
-        clearTimeout(timeoutRef.current);
-        clearInterval(timerRef.current);
-        cleanupWebRTC();
-        setCallState("idle");
-        setCurrentCall(null);
-        setCallDuration(0);
-    }, [cleanupWebRTC, stopRingtone, stopRingback]);
-
-    const startDurationTimer = () => {
-        setCallDuration(0);
-        timerRef.current = setInterval(() => {
-            setCallDuration(prev => prev + 1);
-        }, 1000);
-    };
 
     const value = {
         callState,
