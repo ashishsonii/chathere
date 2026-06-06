@@ -1,0 +1,20 @@
+config:
+  target: "https://api.ashishdev.run.place"
+  phases:
+    - duration: 600
+      arrivalRate: 100
+      rampTo: 2000
+      name: "Extreme Ramp to find breaking point (10 mins)"
+    - duration: 300
+      arrivalRate: 2000
+      name: "Sustained Maximum Load (5 mins)"
+
+scenarios:
+  - name: "Sustained Load - Trigger ASG"
+    flow:
+      - get:
+          url: "/api/status"
+      - get:
+          url: "/api/auth/check"
+      - get:
+          url: "/api/status"
