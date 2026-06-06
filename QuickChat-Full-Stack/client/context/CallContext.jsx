@@ -53,7 +53,7 @@ export const CallProvider = ({ children }) => {
 
             // Set 30s timeout
             timeoutRef.current = setTimeout(() => {
-                if (callState === "calling") {
+                if (callStateRef.current === "calling") {
                     endCall();
                     toast("Call timeout", { icon: "⏰" });
                 }
@@ -105,12 +105,20 @@ export const CallProvider = ({ children }) => {
 
     // --- Socket Listeners ---
 
+    const callStateRef = useRef(callState);
+    const currentCallRef = useRef(currentCall);
+
+    useEffect(() => {
+        callStateRef.current = callState;
+        currentCallRef.current = currentCall;
+    }, [callState, currentCall]);
+
     useEffect(() => {
         if (!socket || !authUser) return;
 
         // 1. Incoming Call
         socket.on("call:incoming", async (data) => {
-            if (callState !== "idle") {
+            if (callStateRef.current !== "idle") {
                 // Busy handling
                 socket.emit("call:reject", { callId: data.callId, reason: "busy" });
                 return;
@@ -148,8 +156,8 @@ export const CallProvider = ({ children }) => {
             startDurationTimer();
             
             // Initialize PeerConnection as Caller and send Offer
-            await initPeerConnection(callId, currentCall.receiverId, true);
-            await createOffer(callId, currentCall.receiverId);
+            await initPeerConnection(callId, currentCallRef.current.receiverId, true);
+            await createOffer(callId, currentCallRef.current.receiverId);
         });
 
         // 4. Call Rejected
@@ -168,7 +176,7 @@ export const CallProvider = ({ children }) => {
 
         // 6. WebRTC: SDP Offer received (Receiver gets this)
         socket.on("call:sdp-offer", async ({ callId, offer }) => {
-            await createAnswer(callId, currentCall.callerId, offer);
+            await createAnswer(callId, currentCallRef.current.callerId, offer);
         });
 
         // 7. WebRTC: SDP Answer received (Caller gets this)
@@ -198,7 +206,7 @@ export const CallProvider = ({ children }) => {
             socket.off("call:ice-candidate");
             socket.off("call:error");
         };
-    }, [socket, callState, currentCall, authUser]);
+    }, [socket, authUser, initPeerConnection, createOffer, createAnswer, handleAnswer, handleIceCandidate, stopRingback, playRingtone, cleanupCall]);
 
     // --- Helpers ---
 
