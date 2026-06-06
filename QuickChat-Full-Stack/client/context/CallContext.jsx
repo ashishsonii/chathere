@@ -143,10 +143,17 @@ export const CallProvider = ({ children }) => {
                 socket.emit("call:reject", { callId: data.callId, reason: "busy" });
                 return;
             }
+
+            // Immediately mark as ringing to prevent duplicate incoming events
+            callStateRef.current = "ringing";
             
             // Fetch caller profile briefly (or use cached if available)
             try {
                 const res = await axios.get(`/api/auth/users/${data.callerId}`).catch(()=>null);
+                
+                // If the call was rejected/ended while we were fetching the profile, ABORT!
+                if (callStateRef.current !== "ringing") return;
+
                 const caller = res?.data?.user || { _id: data.callerId, fullName: "Unknown" };
                 
                 setCurrentCall({

@@ -42,6 +42,11 @@ export const useCallSounds = () => {
         if (ringtoneRef.current) {
             ringtoneRef.current.pause();
             ringtoneRef.current.currentTime = 0;
+            // Force browser to dump the audio buffer to guarantee silence
+            ringtoneRef.current.src = "data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA";
+            ringtoneRef.current.load();
+            // Re-assign for next call
+            ringtoneRef.current.src = '/alarm_sound_effect.mp3';
         }
     }, []);
 
