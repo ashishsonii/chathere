@@ -183,7 +183,7 @@ export const useWebRTC = (socket, userId, axios) => {
             } catch (fallbackError) {
                 console.error("Error accessing media devices:", fallbackError);
                 toast.error(`Media access failed: ${fallbackError.name || fallbackError.message}. Check permissions or if another app is using the mic/camera.`);
-                return null;
+                throw fallbackError;
             }
         }
     };
