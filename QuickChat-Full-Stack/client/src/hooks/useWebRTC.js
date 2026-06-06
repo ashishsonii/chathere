@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
+import toast from 'react-hot-toast';
 
 const ICE_SERVERS = {
     iceServers: [
@@ -170,8 +171,20 @@ export const useWebRTC = (socket, userId, axios) => {
             setLocalStream(stream);
             return stream;
         } catch (error) {
-            console.error("Error accessing media devices:", error);
-            throw error;
+            console.warn("First getUserMedia attempt failed, trying fallback:", error);
+            try {
+                // Fallback without strict constraints
+                const fallbackStream = await navigator.mediaDevices.getUserMedia({
+                    audio: true,
+                    video: type === "video"
+                });
+                setLocalStream(fallbackStream);
+                return fallbackStream;
+            } catch (fallbackError) {
+                console.error("Error accessing media devices:", fallbackError);
+                toast.error(`Media access failed: ${fallbackError.name || fallbackError.message}. Check permissions or if another app is using the mic/camera.`);
+                return null;
+            }
         }
     };
 

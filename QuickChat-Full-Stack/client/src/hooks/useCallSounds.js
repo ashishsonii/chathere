@@ -23,7 +23,7 @@ export const useCallSounds = () => {
     const playRingtone = useCallback(() => {
         if (ringtoneRef.current) {
             ringtoneRef.current.currentTime = 0;
-            ringtoneRef.current.play().catch(e => console.log("Audio play prevented:", e));
+            ringtoneRef.current.play().catch(e => { /* suppressed */ });
         }
     }, []);
 
@@ -37,7 +37,7 @@ export const useCallSounds = () => {
     const playRingback = useCallback(() => {
         if (ringbackRef.current) {
             ringbackRef.current.currentTime = 0;
-            ringbackRef.current.play().catch(e => console.log("Audio play prevented:", e));
+            ringbackRef.current.play().catch(e => { /* suppressed */ });
         }
     }, []);
 
