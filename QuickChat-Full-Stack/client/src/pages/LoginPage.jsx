@@ -25,7 +25,7 @@ const LoginPage = () => {
   }
 
   return (
-    <div className='min-h-screen bg-cover bg-center flex items-center justify-center gap-0 sm:justify-evenly max-sm:flex-col backdrop-blur-2xl'>
+    <div className='h-full flex-1 bg-cover bg-center flex items-center justify-center gap-0 sm:justify-evenly max-sm:flex-col backdrop-blur-2xl'>
 
       {/* -------- left -------- */}
       <div className="flex flex-col items-center sm:items-start gap-1 select-none">

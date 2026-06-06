@@ -25,7 +25,7 @@ const App = () => {
   }
 
   return (
-    <div className="bg-[url('/bgImage.svg')] bg-contain">
+    <div className="bg-[url('/bgImage.svg')] bg-contain h-[100dvh] w-full flex flex-col overflow-hidden">
       <Toaster/>
       <IncomingCallOverlay />
       <OutgoingCallOverlay />
