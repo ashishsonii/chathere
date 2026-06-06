@@ -20,6 +20,9 @@ jobs:
           script: |
             cd ~/chathere/QuickChat-Full-Stack
             git pull origin main
-            cd server
+            cd client
+            npm install
+            npm run build
+            cd ../server
             npm install
             pm2 restart all
