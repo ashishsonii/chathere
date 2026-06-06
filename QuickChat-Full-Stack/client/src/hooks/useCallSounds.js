@@ -3,11 +3,11 @@ import { useRef, useEffect, useCallback } from 'react';
 export const useCallSounds = () => {
     const ringtoneRef = useRef(null);
     const ringbackRef = useRef(null);
+    const isRingingRef = useRef(false);
+    const isRingbackRef = useRef(false);
 
     useEffect(() => {
         // Initialize audio objects
-        // We will generate empty/simple base64 tones if these files don't exist yet, 
-        // or you can add real mp3s to public/sounds/ later.
         ringtoneRef.current = new Audio('/alarm_sound_effect.mp3');
         ringtoneRef.current.loop = true;
 
@@ -21,13 +21,24 @@ export const useCallSounds = () => {
     }, []);
 
     const playRingtone = useCallback(() => {
+        isRingingRef.current = true;
         if (ringtoneRef.current) {
             ringtoneRef.current.currentTime = 0;
-            ringtoneRef.current.play().catch(e => { /* suppressed */ });
+            const promise = ringtoneRef.current.play();
+            if (promise !== undefined) {
+                promise.then(() => {
+                    // If call was rejected while audio was loading, force pause
+                    if (!isRingingRef.current) {
+                        ringtoneRef.current.pause();
+                        ringtoneRef.current.currentTime = 0;
+                    }
+                }).catch(e => { /* suppressed */ });
+            }
         }
     }, []);
 
     const stopRingtone = useCallback(() => {
+        isRingingRef.current = false;
         if (ringtoneRef.current) {
             ringtoneRef.current.pause();
             ringtoneRef.current.currentTime = 0;
@@ -35,13 +46,23 @@ export const useCallSounds = () => {
     }, []);
 
     const playRingback = useCallback(() => {
+        isRingbackRef.current = true;
         if (ringbackRef.current) {
             ringbackRef.current.currentTime = 0;
-            ringbackRef.current.play().catch(e => { /* suppressed */ });
+            const promise = ringbackRef.current.play();
+            if (promise !== undefined) {
+                promise.then(() => {
+                    if (!isRingbackRef.current) {
+                        ringbackRef.current.pause();
+                        ringbackRef.current.currentTime = 0;
+                    }
+                }).catch(e => { /* suppressed */ });
+            }
         }
     }, []);
 
     const stopRingback = useCallback(() => {
+        isRingbackRef.current = false;
         if (ringbackRef.current) {
             ringbackRef.current.pause();
             ringbackRef.current.currentTime = 0;
