@@ -1,4 +1,4 @@
-import React, { useContext } from 'react'
+import React, { useContext, useEffect, useState } from 'react'
 import { Navigate, Route, Routes } from 'react-router-dom'
 import HomePage from './pages/HomePage'
 import LoginPage from './pages/LoginPage'
@@ -12,6 +12,33 @@ import VideoCallScreen from './components/call/VideoCallScreen'
 
 const App = () => {
   const { authUser, isCheckingAuth } = useContext(AuthContext)
+  const [viewportHeight, setViewportHeight] = useState(window.innerHeight);
+
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.visualViewport) {
+        setViewportHeight(window.visualViewport.height);
+        window.scrollTo(0, 0); // Force scroll to top
+      } else {
+        setViewportHeight(window.innerHeight);
+      }
+    };
+
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', handleResize);
+    } else {
+      window.addEventListener('resize', handleResize);
+    }
+    handleResize();
+
+    return () => {
+      if (window.visualViewport) {
+        window.visualViewport.removeEventListener('resize', handleResize);
+      } else {
+        window.removeEventListener('resize', handleResize);
+      }
+    };
+  }, []);
 
   if (isCheckingAuth && !authUser) {
     return (
@@ -25,7 +52,10 @@ const App = () => {
   }
 
   return (
-    <div className="bg-[url('/bgImage.svg')] bg-contain h-[100dvh] w-full flex flex-col overflow-hidden">
+    <div 
+      style={{ height: viewportHeight ? `${viewportHeight}px` : '100dvh' }}
+      className="bg-[url('/bgImage.svg')] bg-contain w-full flex flex-col overflow-hidden fixed inset-0"
+    >
       <Toaster/>
       <IncomingCallOverlay />
       <OutgoingCallOverlay />
