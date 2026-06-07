@@ -119,8 +119,13 @@ const ChatContainer = () => {
                 <img src={selectedUser.profilePic || assets.avatar_icon} alt="" className="w-8 rounded-full"/>
                 <div className='flex-1 text-lg text-white flex items-center gap-2'>
                     <div className='flex flex-col'>
-                        {selectedUser.fullName}
-                        {onlineUsers.includes(selectedUser._id) && <span className="w-2 h-2 rounded-full bg-green-500"></span>}
+                        <div className="flex items-center gap-2">
+                            <span>{selectedUser.fullName}</span>
+                            {onlineUsers.includes(selectedUser._id) && <span className="w-2 h-2 rounded-full bg-green-500"></span>}
+                        </div>
+                        {typingStatus[String(selectedUser._id)] && selectedUser._id !== authUser._id && (
+                            <span className="text-[10px] text-green-400 font-normal">typing...</span>
+                        )}
                     </div>
                 </div>
                 <img onClick={()=> setSelectedUser(null)} src={assets.arrow_icon} alt="" className='md:hidden max-w-7 cursor-pointer'/>
