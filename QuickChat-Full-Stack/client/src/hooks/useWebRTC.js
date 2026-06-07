@@ -80,13 +80,19 @@ export const useWebRTC = (socket, userId, axios) => {
             }
         };
 
-        // 2. When remote tracks arrive, wrap in a NEW MediaStream so React
-        //    always detects the state change (even when a second track arrives
-        //    on the same underlying stream object).
+        // 2. Assign the remote stream directly. Do NOT wrap it in a new MediaStream
+        //    each time, as rapidly recreating the stream object can cause the
+        //    browser's video decoder pipeline to stall or show a black screen.
         pc.ontrack = (event) => {
-            if (event.streams && event.streams[0]) {
-                setRemoteStream(new MediaStream(event.streams[0].getTracks()));
-            }
+            const stream = event.streams && event.streams.length > 0 
+                ? event.streams[0] 
+                : new MediaStream([event.track]);
+            
+            // To force a React re-render if necessary while keeping the same 
+            // stream identity, we just set the state. If the stream is the same 
+            // object, React might bail out, but the DOM <video> element will 
+            // natively handle new tracks being added to its existing srcObject.
+            setRemoteStream(stream);
         };
 
         // 3. ICE connection state monitoring — auto-restart on failure
