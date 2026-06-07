@@ -9,6 +9,9 @@ export class GestureEngine {
         this.currentGesture = null;
         this.animationFrameId = null;
         this.scaleHistory = [];
+        this.lastInferenceTime = 0;
+        this.debounceFrames = 0;
+        this.lastEventPayload = null;
     }
 
     async initialize() {
@@ -45,12 +48,19 @@ export class GestureEngine {
         const renderLoop = () => {
             if (!this.isRunning) return;
 
-            // Only process new frames
+            // Only process new frames and throttle to ~30 FPS to prevent freezing/lag
+            const now = performance.now();
             if (videoElement.currentTime !== lastVideoTime && videoElement.readyState >= 2) {
+                if (now - this.lastInferenceTime < 33) {
+                    this.animationFrameId = requestAnimationFrame(renderLoop);
+                    return;
+                }
+                
                 lastVideoTime = videoElement.currentTime;
+                this.lastInferenceTime = now;
                 
                 try {
-                    const results = this.recognizer.recognizeForVideo(videoElement, performance.now());
+                    const results = this.recognizer.recognizeForVideo(videoElement, now);
                     
                     if (results.gestures.length > 0) {
                         
@@ -68,12 +78,15 @@ export class GestureEngine {
                                 const hand2 = [h2[4], h2[8], h2[12], h2[16], h2[20]];
                                 
                                 this.currentGesture = "connect_webs";
-                                onGesture({
+                                this.debounceFrames = 5;
+                                this.lastEventPayload = {
                                     gesture: "connect_webs",
                                     x: 0, y: 0, z: 0, // Dummy
                                     hand1: hand1,
                                     hand2: hand2
-                                });
+                                };
+                                onGesture(this.lastEventPayload);
+                                this.animationFrameId = requestAnimationFrame(renderLoop);
                                 return; // Skip single hand processing
                             }
                         }
@@ -89,7 +102,6 @@ export class GestureEngine {
                         // Calculate 2D distance between wrist and middle MCP as a proxy for scale
                         const currentScale = Math.sqrt(Math.pow(wrist.x - mcp.x, 2) + Math.pow(wrist.y - mcp.y, 2));
                         
-                        const now = performance.now();
                         this.scaleHistory.push({ time: now, scale: currentScale });
                         if (this.scaleHistory.length > 10) this.scaleHistory.shift();
 
@@ -117,18 +129,26 @@ export class GestureEngine {
 
                         if (mappedGesture && score > 0.6) {
                             this.currentGesture = mappedGesture;
-                            onGesture({
+                            this.debounceFrames = 5; // Allow 5 frames of drop tolerance
+                            this.lastEventPayload = {
                                 gesture: mappedGesture,
                                 x: wrist.x,
                                 y: wrist.y,
                                 z: wrist.z
-                            });
+                            };
+                            onGesture(this.lastEventPayload);
+                        } else if (this.debounceFrames > 0 && this.lastEventPayload) {
+                            this.debounceFrames--;
+                            onGesture(this.lastEventPayload);
                         } else if (this.currentGesture !== null) {
                             this.currentGesture = null;
                             onGesture({ gesture: "none", x: 0, y: 0, z: 0 });
                         }
+                    } else if (this.debounceFrames > 0 && this.lastEventPayload) {
+                        this.debounceFrames--;
+                        onGesture(this.lastEventPayload);
                     } else if (this.currentGesture !== null) {
-                        // Hand was lowered or gesture stopped
+                        // Hand was lowered or gesture stopped and debounce expired
                         this.currentGesture = null;
                         onGesture({ gesture: "none", x: 0, y: 0, z: 0 });
                     }
