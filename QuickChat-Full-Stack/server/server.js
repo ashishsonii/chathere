@@ -11,7 +11,7 @@ import callRoutes from "./routes/callRoutes.js";
 import { Server } from "socket.io";
 import { runMigration } from "./lib/migrate.js";
 import redis from "./lib/redis.js";
-import { setupCallSignaling } from "./services/callSignaling.js";
+import { setupCallSignaling, handleCallDisconnect } from "./services/callSignaling.js";
 
 // Create Express app and HTTP server
 const app = express();
@@ -66,6 +66,9 @@ io.on("connection", async (socket)=>{
     socket.on("disconnect", async ()=>{
         console.log("User Disconnected", userId);
         if (userId) {
+            // Drop any active calls the user is in
+            await handleCallDisconnect(io, userId);
+
             delete userSocketMap[userId];
             await redis.srem("online_users", userId);
         }

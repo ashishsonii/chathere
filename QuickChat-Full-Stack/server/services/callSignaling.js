@@ -2,6 +2,44 @@ import crypto from "crypto";
 import redis from "../lib/redis.js";
 import Call from "../models/Call.js";
 
+// Helper to handle unexpected socket disconnections during an active call
+export const handleCallDisconnect = async (io, userId) => {
+    try {
+        const callId = await redis.get(`call:user:${userId}`);
+        if (!callId) return; // Not in a call
+
+        const stateStr = await redis.get(`call:active:${callId}`);
+        if (!stateStr) return;
+
+        const callState = JSON.parse(stateStr);
+        const otherUserId = callState.callerId === userId ? callState.receiverId : callState.callerId;
+
+        // Clean up Redis
+        await redis.del(`call:active:${callId}`);
+        await redis.del(`call:user:${callState.callerId}`);
+        await redis.del(`call:user:${callState.receiverId}`);
+
+        // Save dropped call to MongoDB
+        await Call.create({
+            callId,
+            type: callState.type,
+            caller: callState.callerId,
+            receiver: callState.receiverId,
+            status: callState.status === "answered" ? "ended" : "missed",
+            startedAt: callState.startedAt,
+            answeredAt: callState.answeredAt,
+            endedAt: Date.now(),
+            duration: 0,
+            quality: "dropped (disconnected)"
+        });
+
+        // Notify other user that call dropped
+        io.to(otherUserId.toString()).emit("call:ended", { callId, reason: "disconnected" });
+    } catch (error) {
+        console.error("Error handling call disconnect:", error);
+    }
+};
+
 // Helper to handle the signaling logic for calls
 export const setupCallSignaling = (io, socket, userSocketMap) => {
     const userId = socket.handshake.query.userId;
