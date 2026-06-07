@@ -156,6 +156,23 @@ export class VFXEngine {
         this.particleSystem.frustumCulled = false; // Prevent particle clipping
         this.scene.add(this.webLines);
 
+        // --- NEW GRAPHICAL DR STRANGE SHIELD MESH ---
+        const textureLoader = new THREE.TextureLoader();
+        const shieldTexture = textureLoader.load('/magic_shield.png');
+        
+        this.shieldMaterial = new THREE.MeshBasicMaterial({
+            map: shieldTexture,
+            transparent: true,
+            blending: THREE.AdditiveBlending, // Makes black background perfectly transparent
+            depthWrite: false,
+            color: 0xffaa00, // Golden magical tint
+            opacity: 0.9
+        });
+        
+        this.shieldMesh = new THREE.Mesh(new THREE.PlaneGeometry(3, 3), this.shieldMaterial);
+        this.shieldMesh.visible = false;
+        this.scene.add(this.shieldMesh);
+
         // State
         this.activeEffect = null;
         this.targetPos = new THREE.Vector3(0,0,0);
@@ -199,12 +216,14 @@ export class VFXEngine {
         if (gesture === "none") {
             this.activeEffect = null;
             this.webLines.visible = false;
+            this.shieldMesh.visible = false;
             return;
         }
 
         if (gesture === "connect_webs" && hand1 && hand2) {
             this.activeEffect = gesture;
             this.webLines.visible = true;
+            this.shieldMesh.visible = false;
             this.hand1Points = hand1;
             this.hand2Points = hand2;
             this.material.uniforms.uEffectType.value = 6;
@@ -235,6 +254,15 @@ export class VFXEngine {
 
         this.material.uniforms.uEffectType.value = typeInt;
         this.activeEffect = gesture;
+        
+        // Toggle Graphic Shield Visibility
+        if (gesture === "open_palm") {
+            this.shieldMesh.visible = true;
+            this.shieldMesh.position.copy(this.targetPos);
+            this.shieldMesh.position.z += 0.2;
+        } else {
+            this.shieldMesh.visible = false;
+        }
     }
 
     spawnParticles(count, typeInt) {
@@ -354,7 +382,6 @@ export class VFXEngine {
             if (this.activeEffect === "thumbs_up") pCount = 15;
             if (this.activeEffect === "two_finger") pCount = 2;
             if (this.activeEffect === "fire_throw") pCount = 20;
-            if (this.activeEffect === "open_palm") pCount = 25; // Dense sparkling shield
             
             if (this.activeEffect === "connect_webs") {
                 // Animate jagged lightning bolts for each finger
@@ -391,6 +418,14 @@ export class VFXEngine {
 
                 // Spawn thick ASMR sparkles along the web lines
                 this.spawnParticles(40, 6);
+            } else if (this.activeEffect === "open_palm") {
+                // Animate Graphic Shield Rotation
+                this.shieldMesh.rotation.z -= delta * 3.0; // Spin magic circle
+                // Smoothly track hand
+                this.shieldMesh.position.lerp(this.targetPos, 0.3);
+                
+                // Add a very small amount of ambient magical sparks around the shield
+                this.spawnParticles(3, this.material.uniforms.uEffectType.value);
             } else {
                 this.spawnParticles(pCount, this.material.uniforms.uEffectType.value);
             }
