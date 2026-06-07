@@ -60,12 +60,14 @@ export const CallProvider = ({ children }) => {
             const stream = await startLocalStream(type);
 
             setCallState("calling");
-            setCurrentCall({
+            const callData = {
                 receiverId: receiver._id,
                 callerId: authUser._id,
                 type,
                 user: receiver // the other person
-            });
+            };
+            setCurrentCall(callData);
+            currentCallRef.current = callData; // Synchronous ref update
             playRingback();
             
             socket.emit("call:initiate", { receiverId: receiver._id, type });
@@ -94,12 +96,14 @@ export const CallProvider = ({ children }) => {
             
             setCallState("connected");
             
-            // 2. Tell signaling server we accepted
-            socket.emit("call:accept", { callId: currentCall.callId });
-            
-            // 3. Initialize PeerConnection as RECEIVER, passing stream explicitly
+            // 2. Initialize PeerConnection as RECEIVER, passing stream explicitly
             //    so it does NOT rely on React state (which hasn't re-rendered yet).
+            //    CRITICAL: This MUST happen before we emit call:accept so the connection
+            //    is ready to receive SDP offers and ICE candidates!
             await initPeerConnection(currentCall.callId, currentCall.callerId, false, stream);
+            
+            // 3. Tell signaling server we accepted
+            socket.emit("call:accept", { callId: currentCall.callId });
             
             startDurationTimer();
         } catch (error) {
@@ -184,7 +188,9 @@ export const CallProvider = ({ children }) => {
 
                 const caller = res?.data?.user || { _id: data.callerId, fullName: "Unknown" };
                 
-                setCurrentCall({ ...data, user: caller });
+                const callData = { ...data, user: caller };
+                setCurrentCall(callData);
+                currentCallRef.current = callData; // Synchronous ref update
                 setCallState("ringing");
                 playRingtone();
                 
@@ -196,7 +202,11 @@ export const CallProvider = ({ children }) => {
 
         // 2. Call Initiated ACK (caller gets callId back)
         const onInitiated = (data) => {
-            setCurrentCall(prev => ({ ...prev, callId: data.callId }));
+            setCurrentCall(prev => {
+                const updated = { ...prev, callId: data.callId };
+                currentCallRef.current = updated;
+                return updated;
+            });
         };
 
         // 3. Call Accepted — caller now sets up WebRTC and sends offer

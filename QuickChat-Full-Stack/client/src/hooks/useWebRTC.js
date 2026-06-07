@@ -21,6 +21,7 @@ export const useWebRTC = (socket, userId, axios) => {
     const [selectedAudioOutput, setSelectedAudioOutput] = useState('default');
     
     const peerConnection = useRef(null);
+    const dataChannelRef = useRef(null);
     const pendingCandidates = useRef([]);
     // localStreamRef is set SYNCHRONOUSLY in startLocalStream, before React
     // batches the setState. This guarantees initPeerConnection always sees
@@ -102,7 +103,19 @@ export const useWebRTC = (socket, userId, axios) => {
             console.log(`[WebRTC] Connection state: ${pc.connectionState}`);
         };
 
-        // 4. Add local media tracks to the peer connection.
+        // 4. Dummy DataChannel to keep DTLS alive for certain browsers/NATs
+        if (isInitiator) {
+            const channel = pc.createDataChannel("vfx_sync");
+            channel.onopen = () => console.log(`[WebRTC] DataChannel opened`);
+            dataChannelRef.current = channel;
+        } else {
+            pc.ondatachannel = (event) => {
+                event.channel.onopen = () => console.log(`[WebRTC] DataChannel opened`);
+                dataChannelRef.current = event.channel;
+            };
+        }
+
+        // 5. Add local media tracks to the peer connection.
         //    Priority: explicit param > synchronous ref > React state
         const mediaStream = explicitStream || localStreamRef.current;
         if (mediaStream) {
@@ -473,6 +486,10 @@ export const useWebRTC = (socket, userId, axios) => {
             peerConnection.current.onconnectionstatechange = null;
             peerConnection.current.close();
             peerConnection.current = null;
+        }
+        if (dataChannelRef.current) {
+            dataChannelRef.current.close();
+            dataChannelRef.current = null;
         }
         // Stop screen share stream if active
         if (cameraStreamRef.current) {
