@@ -84,10 +84,10 @@ const ChatContainer = () => {
 
     // Auto scroll management
     useEffect(()=>{
-        if (scrollEnd.current && messages && !isLoadingMore) {
+        if (scrollEnd.current && !isLoadingMore) {
             scrollEnd.current.scrollIntoView({ behavior: "smooth" });
         }
-    },[messages])
+    },[messages, typingStatus, selectedUser])
 
     // Scroll up dynamic pagination trigger
     const handleScroll = async () => {
@@ -180,7 +180,7 @@ const ChatContainer = () => {
                             </div>
                         </div>
                     ))}
-                    {typingStatus[selectedUser?._id] && selectedUser?._id !== authUser?._id && (
+                    {typingStatus[String(selectedUser?._id)] && selectedUser?._id !== authUser?._id && (
                         <div className="flex items-end gap-2 justify-start">
                             <div className="text-center text-xs shrink-0">
                                 <img src={selectedUser?.profilePic || assets.avatar_icon} alt="" className="w-7 rounded-full" />

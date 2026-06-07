@@ -139,10 +139,10 @@ export const ChatProvider = ({ children })=>{
         if(!socket) return;
 
         socket.on("newMessage", (newMessage)=>{
-            if(selectedUser && newMessage.senderId === selectedUser._id){
+            if(selectedUser && String(newMessage.senderId) === String(selectedUser._id)){
                 newMessage.seen = true;
                 setMessages((prevMessages)=> [...prevMessages, newMessage]);
-                axios.put(`/api/messages/mark/${newMessage._id}`);
+                axios.put(`/api/messages/mark/${newMessage._id}`).catch(e => console.log(e));
             }
         })
     }
@@ -158,7 +158,7 @@ export const ChatProvider = ({ children })=>{
 
         socket.on("conversationUpdate", (updatedConv) => {
             setConversations((prevConvs) => {
-                const filtered = prevConvs.filter(c => c._id !== updatedConv._id);
+                const filtered = prevConvs.filter(c => String(c._id) !== String(updatedConv._id));
                 return [updatedConv, ...filtered];
             });
         });
@@ -184,7 +184,9 @@ export const ChatProvider = ({ children })=>{
         if (!socket) return;
 
         socket.on("typing", ({ fromUserId, typing }) => {
-            setTypingStatus((prev) => ({ ...prev, [fromUserId]: typing }));
+            if (fromUserId) {
+                setTypingStatus((prev) => ({ ...prev, [String(fromUserId)]: typing }));
+            }
         });
     };
 
