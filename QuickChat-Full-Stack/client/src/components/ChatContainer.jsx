@@ -87,7 +87,7 @@ const ChatContainer = () => {
         if (scrollEnd.current && !isLoadingMore) {
             scrollEnd.current.scrollIntoView({ behavior: "smooth" });
         }
-    },[messages, typingStatus, selectedUser])
+    },[messages, typingStatus, selectedUser, isLoadingMore])
 
     // Scroll up dynamic pagination trigger
     const handleScroll = async () => {
