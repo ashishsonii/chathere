@@ -42,6 +42,9 @@ const VideoCallScreen = () => {
     const [showAudioPicker, setShowAudioPicker] = useState(false);
     const hideTimerRef = useRef(null);
 
+    // --- Smooth Video State ---
+    const [isVideoReady, setIsVideoReady] = useState(false);
+
     // --- Orientation & fit ---
     const [forceLandscape, setForceLandscape] = useState(false);
     const [fitMode, setFitMode] = useState('contain'); // 'contain' | 'cover'
@@ -104,6 +107,9 @@ const VideoCallScreen = () => {
 
     // Bind remote stream to remote video element
     useEffect(() => {
+        if (!remoteStream) {
+            setIsVideoReady(false);
+        }
         if (remoteVideoRef.current && remoteStream) {
             remoteVideoRef.current.srcObject = remoteStream;
             remoteVideoRef.current.play().catch(() => {});
@@ -184,24 +190,23 @@ const VideoCallScreen = () => {
             
             {/* Remote Video (Full Screen) */}
             <div className="flex-1 relative w-full h-full overflow-hidden">
-                {remoteStream ? (
-                    <>
-                        <video 
-                            ref={setRemoteVideoRef} 
-                            autoPlay 
-                            playsInline 
-                            className={`w-full h-full`}
-                            style={{ 
-                                objectFit: fitMode,
-                                background: '#000',
-                                transform: `scale(${zoomLevel})`,
-                                transformOrigin: 'center center',
-                                transition: 'transform 0.2s ease'
-                            }}
-                        />
-                    </>
-                ) : (
-                    <div className="w-full h-full flex items-center justify-center bg-gray-900">
+                {/* The video element is always rendered if remoteStream exists, but kept invisible until onCanPlay */}
+                <video 
+                    ref={setRemoteVideoRef} 
+                    autoPlay 
+                    playsInline
+                    onCanPlay={() => setIsVideoReady(true)}
+                    className={`w-full h-full transition-opacity duration-500 ${remoteStream && isVideoReady ? 'opacity-100' : 'opacity-0'}`}
+                    style={{ 
+                        objectFit: fitMode,
+                        background: '#000',
+                        transform: `scale(${zoomLevel})`,
+                        transformOrigin: 'center center',
+                    }}
+                />
+
+                {(!remoteStream || !isVideoReady) && (
+                    <div className="absolute inset-0 z-10 w-full h-full flex items-center justify-center bg-gray-900">
                         <div className="flex flex-col items-center gap-4">
                             <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-violet-500"></div>
                             <p className="text-gray-400 text-sm">Connecting video...</p>
@@ -246,10 +251,10 @@ const VideoCallScreen = () => {
                 </div>
 
                 {/* Header overlay — auto-hides */}
-                <div className={`absolute top-0 left-0 w-full p-6 bg-gradient-to-b from-black/70 to-transparent flex justify-between items-start pointer-events-none transition-opacity duration-300 ${controlsVisible ? 'opacity-100' : 'opacity-0'}`}>
+                <div className={`absolute top-0 left-0 w-full p-6 md:p-8 bg-gradient-to-b from-black/70 to-transparent flex justify-between items-start pointer-events-none transition-opacity duration-300 ${controlsVisible ? 'opacity-100' : 'opacity-0'}`}>
                     <div className="flex flex-col drop-shadow-md">
-                        <h2 className="text-xl font-bold text-white">{currentCall.user?.fullName}</h2>
-                        <p className="text-gray-300 font-mono">{formatDuration(callDuration)}</p>
+                        <h2 className="text-xl md:text-3xl font-bold text-white tracking-wide drop-shadow-lg">{currentCall.user?.fullName}</h2>
+                        <p className="text-gray-300 font-mono text-sm md:text-lg font-medium tracking-wider mt-1">{formatDuration(callDuration)}</p>
                     </div>
                 </div>
 
@@ -359,10 +364,10 @@ const VideoCallScreen = () => {
                     )}
                 </button>
 
-                {/* Landscape/Portrait Toggle */}
+                {/* Landscape/Portrait Toggle (Mobile Only) */}
                 <button 
                     onClick={toggleLandscape}
-                    className={`w-10 h-10 md:w-12 md:h-12 rounded-full flex items-center justify-center transition-colors ${forceLandscape ? 'bg-amber-500 text-white' : 'bg-gray-700 text-white hover:bg-gray-600'}`}
+                    className={`w-10 h-10 md:hidden rounded-full flex items-center justify-center transition-colors ${forceLandscape ? 'bg-amber-500 text-white' : 'bg-gray-700 text-white hover:bg-gray-600'}`}
                     title={forceLandscape ? 'Switch to Portrait' : 'Switch to Landscape'}
                 >
                     {forceLandscape ? (

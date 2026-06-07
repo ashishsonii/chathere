@@ -11,6 +11,13 @@ const ICE_SERVERS = {
     iceCandidatePoolSize: 10
 };
 
+// Munge SDP to force Application Specific bandwidth (8 Mbps) for high quality chunks
+const mungeSDP = (sdp) => {
+    if (!sdp) return sdp;
+    // Inject bandwidth limit into each media section
+    return sdp.replace(/a=mid:(.*)\r\n/g, 'a=mid:$1\r\nb=AS:8000\r\n');
+};
+
 export const useWebRTC = (socket, userId, axios) => {
     const [localStream, setLocalStream] = useState(null);
     const [remoteStream, setRemoteStream] = useState(null);
@@ -38,6 +45,11 @@ export const useWebRTC = (socket, userId, axios) => {
     const initPeerConnection = useCallback(async (callId, remoteUserId, isInitiator, explicitStream) => {
         // Clean up any prior connection fully before creating a new one
         if (peerConnection.current) {
+            try {
+                peerConnection.current.getTransceivers().forEach(t => {
+                    if (t.stop) t.stop();
+                });
+            } catch (e) {}
             peerConnection.current.ontrack = null;
             peerConnection.current.onicecandidate = null;
             peerConnection.current.oniceconnectionstatechange = null;
@@ -126,7 +138,19 @@ export const useWebRTC = (socket, userId, axios) => {
         const mediaStream = explicitStream || localStreamRef.current;
         if (mediaStream) {
             mediaStream.getTracks().forEach(track => {
-                pc.addTrack(track, mediaStream);
+                const sender = pc.addTrack(track, mediaStream);
+                // Enforce high bitrate on the sender for Full HD video
+                if (track.kind === 'video') {
+                    try {
+                        const params = sender.getParameters();
+                        if (!params.encodings) params.encodings = [{}];
+                        params.encodings.forEach(enc => {
+                            enc.maxBitrate = 4_000_000; // 4 Mbps for camera
+                            enc.maxFramerate = 30;
+                        });
+                        sender.setParameters(params).catch(() => {});
+                    } catch (e) {}
+                }
             });
             console.log(`[WebRTC] Added ${mediaStream.getTracks().length} local track(s)`);
         } else {
@@ -146,6 +170,7 @@ export const useWebRTC = (socket, userId, axios) => {
                 offerToReceiveAudio: true,
                 offerToReceiveVideo: true
             });
+            offer.sdp = mungeSDP(offer.sdp); // Enforce bitrate via SDP
             await pc.setLocalDescription(offer);
             
             socket.emit("call:sdp-offer", {
@@ -166,6 +191,7 @@ export const useWebRTC = (socket, userId, axios) => {
         try {
             await pc.setRemoteDescription(new RTCSessionDescription(offer));
             const answer = await pc.createAnswer();
+            answer.sdp = mungeSDP(answer.sdp); // Enforce bitrate via SDP
             await pc.setLocalDescription(answer);
 
             socket.emit("call:sdp-answer", {
@@ -244,9 +270,9 @@ export const useWebRTC = (socket, userId, axios) => {
                 autoGainControl: true
             },
             video: type === "video" ? {
-                width: { ideal: 1280, max: 1920 },
-                height: { ideal: 720, max: 1080 },
-                frameRate: { ideal: 30, max: 30 },
+                width: { ideal: 1920, max: 3840 },
+                height: { ideal: 1080, max: 2160 },
+                frameRate: { ideal: 30, max: 60 },
                 facingMode: "user"
             } : false
         };
@@ -281,7 +307,10 @@ export const useWebRTC = (socket, userId, axios) => {
 
     const stopLocalStream = useCallback(() => {
         if (localStreamRef.current) {
-            localStreamRef.current.getTracks().forEach(t => t.stop());
+            localStreamRef.current.getTracks().forEach(t => {
+                t.enabled = false;
+                t.stop();
+            });
             localStreamRef.current = null;
         }
         setLocalStream(null);
@@ -486,6 +515,11 @@ export const useWebRTC = (socket, userId, axios) => {
 
     const cleanup = useCallback(() => {
         if (peerConnection.current) {
+            try {
+                peerConnection.current.getTransceivers().forEach(t => {
+                    if (t.stop) t.stop();
+                });
+            } catch (e) {}
             peerConnection.current.ontrack = null;
             peerConnection.current.onicecandidate = null;
             peerConnection.current.oniceconnectionstatechange = null;
@@ -499,11 +533,22 @@ export const useWebRTC = (socket, userId, axios) => {
         }
         // Stop screen share stream if active
         if (cameraStreamRef.current) {
-            cameraStreamRef.current.getTracks().forEach(t => t.stop());
+            cameraStreamRef.current.getTracks().forEach(t => {
+                t.enabled = false;
+                t.stop();
+            });
             cameraStreamRef.current = null;
         }
         stopLocalStream();
-        setRemoteStream(null);
+        setRemoteStream(prev => {
+            if (prev) {
+                prev.getTracks().forEach(t => {
+                    t.enabled = false;
+                    t.stop();
+                });
+            }
+            return null;
+        });
         setIsMuted(false);
         setIsCameraOff(false);
         setIsScreenSharing(false);

@@ -274,6 +274,14 @@ export const CallProvider = ({ children }) => {
         };
         socket.on("call:screen-share", onRemoteScreenShare);
 
+        // 11. Cleanup on page unload
+        const handleUnload = () => {
+            if (currentCallRef.current && callStateRef.current !== "idle") {
+                socket.emit("call:end", { callId: currentCallRef.current.callId, duration: 0 });
+            }
+        };
+        window.addEventListener("beforeunload", handleUnload);
+
         return () => {
             socket.off("call:incoming", onIncoming);
             socket.off("call:initiated", onInitiated);
@@ -285,6 +293,7 @@ export const CallProvider = ({ children }) => {
             socket.off("call:ice-candidate", onIceCandidate);
             socket.off("call:error", onError);
             socket.off("call:screen-share", onRemoteScreenShare);
+            window.removeEventListener("beforeunload", handleUnload);
         };
     }, [socket, authUser, initPeerConnection, createOffer, createAnswer, handleAnswer, handleIceCandidate, stopRingback, playRingtone, cleanupCall, axios]);
 
