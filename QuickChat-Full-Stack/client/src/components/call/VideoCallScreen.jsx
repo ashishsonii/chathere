@@ -47,22 +47,48 @@ const VideoCallScreen = () => {
     const [fitMode, setFitMode] = useState('contain'); // 'contain' | 'cover'
     const [zoomLevel, setZoomLevel] = useState(1); // 1 = 100%, range 0.5 – 2.0
 
-    const resetHideTimer = useCallback(() => {
-        setControlsVisible(true);
-        clearTimeout(hideTimerRef.current);
-        hideTimerRef.current = setTimeout(() => {
-            setControlsVisible(false);
-            setShowAudioPicker(false);
-        }, 4000);
+    const handleTapToggle = useCallback((e) => {
+        // Prevent toggle if clicking on a button or the controls bar
+        if (e.target.closest('button') || e.target.closest('.controls-bar')) return;
+        
+        setControlsVisible(prev => {
+            const next = !prev;
+            if (next) {
+                clearTimeout(hideTimerRef.current);
+                hideTimerRef.current = setTimeout(() => {
+                    setControlsVisible(false);
+                    setShowAudioPicker(false);
+                }, 4000);
+            } else {
+                clearTimeout(hideTimerRef.current);
+                setShowAudioPicker(false);
+            }
+            return next;
+        });
+    }, []);
+
+    const handleMouseMove = useCallback(() => {
+        setControlsVisible(prev => {
+            clearTimeout(hideTimerRef.current);
+            hideTimerRef.current = setTimeout(() => {
+                setControlsVisible(false);
+                setShowAudioPicker(false);
+            }, 4000);
+            return true; // Always visible on mouse move
+        });
     }, []);
 
     // Start auto-hide timer when connected
     useEffect(() => {
         if (callState === 'connected') {
-            resetHideTimer();
+            clearTimeout(hideTimerRef.current);
+            hideTimerRef.current = setTimeout(() => {
+                setControlsVisible(false);
+                setShowAudioPicker(false);
+            }, 4000);
         }
         return () => clearTimeout(hideTimerRef.current);
-    }, [callState, resetHideTimer]);
+    }, [callState]);
 
     // Bind local stream to local video element
     useEffect(() => {
@@ -148,9 +174,8 @@ const VideoCallScreen = () => {
             ref={containerRef}
             className="fixed inset-0 z-40 bg-black flex flex-col"
             style={forceLandscape ? landscapeStyle : {}}
-            onClick={resetHideTimer}
-            onMouseMove={resetHideTimer}
-            onTouchStart={resetHideTimer}
+            onClick={handleTapToggle}
+            onMouseMove={handleMouseMove}
         >
             
             {/* Remote Video (Full Screen) */}
@@ -221,7 +246,7 @@ const VideoCallScreen = () => {
                 </div>
 
                 {/* --- Zoom & Fit controls (right side, vertical) --- */}
-                <div className={`absolute right-3 top-1/2 -translate-y-1/2 flex flex-col items-center gap-2 transition-opacity duration-300 ${controlsVisible ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
+                <div className={`controls-bar absolute right-3 top-1/2 -translate-y-1/2 flex flex-col items-center gap-2 transition-opacity duration-300 ${controlsVisible ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
                     {/* Zoom In */}
                     <button 
                         onClick={() => setZoomLevel(prev => Math.min(prev + 0.15, 2.5))}
@@ -255,7 +280,7 @@ const VideoCallScreen = () => {
             </div>
 
             {/* Controls — auto-hides after 4s */}
-            <div className={`absolute bottom-10 left-1/2 transform -translate-x-1/2 flex items-center gap-3 md:gap-5 bg-gray-900/80 px-5 md:px-7 py-3.5 rounded-full backdrop-blur-md shadow-2xl border border-white/10 transition-all duration-300 ${controlsVisible ? 'translate-y-0 opacity-100' : 'translate-y-20 opacity-0 pointer-events-none'}`}>
+            <div className={`controls-bar absolute bottom-10 left-1/2 transform -translate-x-1/2 flex items-center gap-3 md:gap-5 bg-gray-900/80 px-5 md:px-7 py-3.5 rounded-full backdrop-blur-md shadow-2xl border border-white/10 transition-all duration-300 ${controlsVisible ? 'translate-y-0 opacity-100' : 'translate-y-20 opacity-0 pointer-events-none'}`}>
                 
                 {/* Mute Button */}
                 <button 
