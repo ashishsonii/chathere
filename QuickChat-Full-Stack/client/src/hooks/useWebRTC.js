@@ -19,6 +19,7 @@ export const useWebRTC = (socket, userId, axios) => {
     const [isScreenSharing, setIsScreenSharing] = useState(false);
     const [audioOutputDevices, setAudioOutputDevices] = useState([]);
     const [selectedAudioOutput, setSelectedAudioOutput] = useState('default');
+    const [iceConnectionState, setIceConnectionState] = useState('new');
     
     const peerConnection = useRef(null);
     const dataChannelRef = useRef(null);
@@ -104,9 +105,9 @@ export const useWebRTC = (socket, userId, axios) => {
         pc.oniceconnectionstatechange = () => {
             const state = pc.iceConnectionState;
             console.log(`[WebRTC] ICE state: ${state}`);
+            setIceConnectionState(state);
             if (state === 'failed') {
-                console.warn("[WebRTC] ICE failed — attempting ICE restart");
-                pc.restartIce();
+                console.warn("[WebRTC] ICE failed");
             }
         };
 
@@ -543,6 +544,7 @@ export const useWebRTC = (socket, userId, axios) => {
         setIsMuted(false);
         setIsCameraOff(false);
         setIsScreenSharing(false);
+        setIceConnectionState('new');
         pendingCandidates.current = [];
     }, [stopLocalStream]);
 
@@ -564,6 +566,7 @@ export const useWebRTC = (socket, userId, axios) => {
         toggleCamera,
         toggleScreenShare,
         changeAudioOutput,
+        iceConnectionState,
         cleanup
     };
 };

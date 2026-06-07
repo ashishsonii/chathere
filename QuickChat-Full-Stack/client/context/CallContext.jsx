@@ -14,6 +14,8 @@ export const CallProvider = ({ children }) => {
     const [currentCall, setCurrentCall] = useState(null); // { callId, callerId, receiverId, type, ...user }
     const [callDuration, setCallDuration] = useState(0);
     const [remoteIsScreenSharing, setRemoteIsScreenSharing] = useState(false);
+    const [remoteIsCameraOff, setRemoteIsCameraOff] = useState(false);
+    const [remoteIsMuted, setRemoteIsMuted] = useState(false);
 
     const { playRingtone, stopRingtone, playRingback, stopRingback } = useCallSounds();
     const {
@@ -30,10 +32,11 @@ export const CallProvider = ({ children }) => {
         createAnswer,
         handleAnswer,
         handleIceCandidate,
-        toggleMute,
-        toggleCamera,
+        toggleMute: webrtcToggleMute,
+        toggleCamera: webrtcToggleCamera,
         toggleScreenShare: webrtcToggleScreenShare,
         changeAudioOutput,
+        iceConnectionState,
         cleanup: cleanupWebRTC
     } = useWebRTC(socket, authUser?._id, axios);
 
@@ -54,7 +57,7 @@ export const CallProvider = ({ children }) => {
     // --- Core Actions ---
 
     const initiateCall = async (receiver, type) => {
-        if (!socket || !authUser) return;
+        if (!socket || !authUser || callState !== "idle") return;
         try {
             // Acquire media FIRST — if this fails, we abort before ringing
             const stream = await startLocalStream(type);
@@ -86,7 +89,7 @@ export const CallProvider = ({ children }) => {
     };
 
     const acceptCall = async () => {
-        if (!socket || !currentCall) return;
+        if (!socket || !currentCall || callState === "connected") return;
         stopRingtone();
         clearTimeout(timeoutRef.current);
         
@@ -141,12 +144,13 @@ export const CallProvider = ({ children }) => {
         setCurrentCall(null);
         setCallDuration(0);
         setRemoteIsScreenSharing(false);
+        setRemoteIsCameraOff(false);
+        setRemoteIsMuted(false);
     }, [cleanupWebRTC, stopRingtone, stopRingback]);
 
     // Wrapper around webrtcToggleScreenShare that also signals the remote peer
     const toggleScreenShare = async () => {
         const result = await webrtcToggleScreenShare();
-        // Determine the remote user ID
         const remoteUserId = currentCallRef.current?.callerId === authUser?._id
             ? currentCallRef.current?.receiverId
             : currentCallRef.current?.callerId;
@@ -154,6 +158,38 @@ export const CallProvider = ({ children }) => {
             socket.emit("call:screen-share", { to: remoteUserId, isSharing: result });
         }
         return result;
+    };
+
+    const toggleMute = () => {
+        const isMutedNow = webrtcToggleMute();
+        const remoteUserId = currentCallRef.current?.callerId === authUser?._id
+            ? currentCallRef.current?.receiverId
+            : currentCallRef.current?.callerId;
+        if (socket && remoteUserId && currentCallRef.current?.callId) {
+            socket.emit("call:toggle-media", { 
+                callId: currentCallRef.current.callId, 
+                to: remoteUserId, 
+                mediaType: "audio", 
+                isEnabled: !isMutedNow 
+            });
+        }
+        return isMutedNow;
+    };
+
+    const toggleCamera = () => {
+        const isCameraOffNow = webrtcToggleCamera();
+        const remoteUserId = currentCallRef.current?.callerId === authUser?._id
+            ? currentCallRef.current?.receiverId
+            : currentCallRef.current?.callerId;
+        if (socket && remoteUserId && currentCallRef.current?.callId) {
+            socket.emit("call:toggle-media", { 
+                callId: currentCallRef.current.callId, 
+                to: remoteUserId, 
+                mediaType: "video", 
+                isEnabled: !isCameraOffNow 
+            });
+        }
+        return isCameraOffNow;
     };
 
     const startDurationTimer = () => {
@@ -211,6 +247,7 @@ export const CallProvider = ({ children }) => {
 
         // 3. Call Accepted — caller now sets up WebRTC and sends offer
         const onAccepted = async ({ callId }) => {
+            if (!currentCallRef.current || currentCallRef.current.callId !== callId) return;
             stopRingback();
             clearTimeout(timeoutRef.current);
             setCallState("connected");
@@ -239,16 +276,19 @@ export const CallProvider = ({ children }) => {
 
         // 6. SDP Offer received (receiver gets this after caller creates offer)
         const onSdpOffer = async ({ callId, offer }) => {
+            if (!currentCallRef.current || currentCallRef.current.callId !== callId) return;
             await createAnswer(callId, currentCallRef.current.callerId, offer);
         };
 
         // 7. SDP Answer received (caller gets this after receiver answers)
-        const onSdpAnswer = async ({ answer }) => {
+        const onSdpAnswer = async ({ callId, answer }) => {
+            if (!currentCallRef.current || currentCallRef.current.callId !== callId) return;
             await handleAnswer(answer);
         };
 
         // 8. ICE Candidate received
-        const onIceCandidate = async ({ candidate }) => {
+        const onIceCandidate = async ({ callId, candidate }) => {
+            if (!currentCallRef.current || currentCallRef.current.callId !== callId) return;
             await handleIceCandidate(candidate);
         };
 
@@ -274,7 +314,15 @@ export const CallProvider = ({ children }) => {
         };
         socket.on("call:screen-share", onRemoteScreenShare);
 
-        // 11. Cleanup on page unload
+        // 11. Remote media toggled
+        const onMediaToggled = ({ callId, mediaType, isEnabled }) => {
+            if (!currentCallRef.current || currentCallRef.current.callId !== callId) return;
+            if (mediaType === "video") setRemoteIsCameraOff(!isEnabled);
+            if (mediaType === "audio") setRemoteIsMuted(!isEnabled);
+        };
+        socket.on("call:media-toggled", onMediaToggled);
+
+        // 12. Cleanup on page unload
         const handleUnload = () => {
             if (currentCallRef.current && callStateRef.current !== "idle") {
                 socket.emit("call:end", { callId: currentCallRef.current.callId, duration: 0 });
@@ -293,9 +341,10 @@ export const CallProvider = ({ children }) => {
             socket.off("call:ice-candidate", onIceCandidate);
             socket.off("call:error", onError);
             socket.off("call:screen-share", onRemoteScreenShare);
+            socket.off("call:media-toggled", onMediaToggled);
             window.removeEventListener("beforeunload", handleUnload);
         };
-    }, [socket, authUser, initPeerConnection, createOffer, createAnswer, handleAnswer, handleIceCandidate, stopRingback, playRingtone, cleanupCall, axios]);
+    }, [socket, authUser, initPeerConnection, createOffer, createAnswer, handleAnswer, handleIceCandidate, stopRingback, playRingtone, cleanupCall, axios, webrtcToggleMute, webrtcToggleCamera]);
 
 
     const value = {
@@ -308,8 +357,11 @@ export const CallProvider = ({ children }) => {
         isCameraOff,
         isScreenSharing,
         remoteIsScreenSharing,
+        remoteIsCameraOff,
+        remoteIsMuted,
         audioOutputDevices,
         selectedAudioOutput,
+        iceConnectionState,
         initiateCall,
         acceptCall,
         rejectCall,

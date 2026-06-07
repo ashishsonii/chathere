@@ -27,8 +27,11 @@ const VideoCallScreen = () => {
         isCameraOff,
         isScreenSharing,
         remoteIsScreenSharing,
+        remoteIsCameraOff,
+        remoteIsMuted,
         audioOutputDevices,
         selectedAudioOutput,
+        iceConnectionState,
         localStream,
         remoteStream
     } = useContext(CallContext);
@@ -41,9 +44,6 @@ const VideoCallScreen = () => {
     const [controlsVisible, setControlsVisible] = useState(true);
     const [showAudioPicker, setShowAudioPicker] = useState(false);
     const hideTimerRef = useRef(null);
-
-    // --- Smooth Video State ---
-    const [isVideoReady, setIsVideoReady] = useState(false);
 
     // --- Orientation & fit ---
     const [forceLandscape, setForceLandscape] = useState(false);
@@ -107,9 +107,6 @@ const VideoCallScreen = () => {
 
     // Bind remote stream to remote video element
     useEffect(() => {
-        if (!remoteStream) {
-            setIsVideoReady(false);
-        }
         if (remoteVideoRef.current && remoteStream) {
             remoteVideoRef.current.srcObject = remoteStream;
             remoteVideoRef.current.play().catch(() => {});
@@ -195,8 +192,7 @@ const VideoCallScreen = () => {
                     ref={setRemoteVideoRef} 
                     autoPlay 
                     playsInline
-                    onCanPlay={() => setIsVideoReady(true)}
-                    className={`w-full h-full transition-opacity duration-500 ${remoteStream && isVideoReady ? 'opacity-100' : 'opacity-0'}`}
+                    className={`w-full h-full transition-opacity duration-500 ${remoteStream ? 'opacity-100' : 'opacity-0'}`}
                     style={{ 
                         objectFit: fitMode,
                         background: '#000',
@@ -205,11 +201,38 @@ const VideoCallScreen = () => {
                     }}
                 />
 
-                {(!remoteStream || !isVideoReady) && (
+                {(!remoteStream || iceConnectionState === 'new' || iceConnectionState === 'checking') && (
                     <div className="absolute inset-0 z-10 w-full h-full flex items-center justify-center bg-gray-900">
                         <div className="flex flex-col items-center gap-4">
                             <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-violet-500"></div>
-                            <p className="text-gray-400 text-sm">Connecting video...</p>
+                            <p className="text-gray-400 text-sm">
+                                {iceConnectionState === 'checking' ? 'Connecting media...' : 'Waiting for video...'}
+                            </p>
+                        </div>
+                    </div>
+                )}
+
+                {/* Remote Camera Off Indicator */}
+                {iceConnectionState === 'connected' && remoteIsCameraOff && (
+                    <div className="absolute inset-0 z-10 w-full h-full flex flex-col items-center justify-center bg-gray-900/90 backdrop-blur-md">
+                        <div className="w-24 h-24 rounded-full bg-gray-800 flex items-center justify-center mb-4 border border-gray-700 shadow-xl">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15.75 10.5l4.72-4.72a.75.75 0 011.28.53v11.38a.75.75 0 01-1.28.53l-4.72-4.72M4.5 18.75h9a2.25 2.25 0 002.25-2.25v-9a2.25 2.25 0 00-2.25-2.25h-9A2.25 2.25 0 002.25 7.5v9a2.25 2.25 0 002.25 2.25z" />
+                                <line x1="3" y1="3" x2="21" y2="21" stroke="currentColor" strokeWidth={2} strokeLinecap="round" />
+                            </svg>
+                        </div>
+                        <p className="text-white font-medium text-lg">{currentCall.user?.fullName} turned off their camera</p>
+                    </div>
+                )}
+                
+                {iceConnectionState === 'failed' && (
+                    <div className="absolute inset-0 z-10 w-full h-full flex items-center justify-center bg-gray-900/80 backdrop-blur-sm">
+                        <div className="bg-red-500/10 border border-red-500/30 p-4 rounded-xl flex flex-col items-center gap-3">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                            </svg>
+                            <p className="text-red-400 font-medium">Connection Failed</p>
+                            <p className="text-gray-400 text-sm text-center max-w-xs">Could not establish a direct connection. This is often caused by restrictive firewalls or NAT types.</p>
                         </div>
                     </div>
                 )}
@@ -253,7 +276,16 @@ const VideoCallScreen = () => {
                 {/* Header overlay — auto-hides */}
                 <div className={`absolute top-0 left-0 w-full p-6 md:p-8 bg-gradient-to-b from-black/70 to-transparent flex justify-between items-start pointer-events-none transition-opacity duration-300 ${controlsVisible ? 'opacity-100' : 'opacity-0'}`}>
                     <div className="flex flex-col drop-shadow-md">
-                        <h2 className="text-xl md:text-3xl font-bold text-white tracking-wide drop-shadow-lg">{currentCall.user?.fullName}</h2>
+                        <div className="flex items-center gap-3">
+                            <h2 className="text-xl md:text-3xl font-bold text-white tracking-wide drop-shadow-lg">{currentCall.user?.fullName}</h2>
+                            {remoteIsMuted && (
+                                <div className="bg-red-500/80 p-1.5 rounded-full backdrop-blur-sm shadow-md" title="User is muted">
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7.02 7.02 0 01-1.42 4.24m-1.55 1.55A7.02 7.02 0 0112 18a7 7 0 01-7-7M5 11v-1m0-2V7m0 2h.01M5 7h.01m13.98 0A6.98 6.98 0 0019 11M3 3l18 18" />
+                                    </svg>
+                                </div>
+                            )}
+                        </div>
                         <p className="text-gray-300 font-mono text-sm md:text-lg font-medium tracking-wider mt-1">{formatDuration(callDuration)}</p>
                     </div>
                 </div>
