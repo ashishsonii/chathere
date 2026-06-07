@@ -31,7 +31,7 @@ void main() {
     } else if (uEffectType == 5) { // Fire Throw (Push)
         pos += velocity * (uTime * 15.0);
     } else if (uEffectType == 6) { // Web Sparkles
-        pos += velocity * uTime * 5.0; // Fast scattered sparkles
+        pos += velocity * (uTime * 0.2); // Keep them tightly clustered to form a sharp web line!
     } else { // Dr Strange Shield (Open Palm)
         // velocity.x = base angle, velocity.y = radius
         float angle = velocity.x + uTime * 3.0; // Spin speed
@@ -143,10 +143,11 @@ export class VFXEngine {
         
         this.webMaterial = new THREE.LineBasicMaterial({
             color: 0x00ffff,
+            linewidth: 3, // Fallback, WebGL limits this to 1px on Windows
             transparent: true,
-            opacity: 0.8,
+            opacity: 1.0,
             blending: THREE.AdditiveBlending,
-            depthWrite: false
+            depthWrite: true
         });
         
         this.webLines = new THREE.LineSegments(this.webGeometry, this.webMaterial);
@@ -251,15 +252,20 @@ export class VFXEngine {
                     const p1 = this.webBase1[fIdx];
                     const p2 = this.webBase2[fIdx];
 
-                    this.positions[i*3] = p1.x + (p2.x - p1.x) * t + (Math.random() - 0.5) * 0.2;
-                    this.positions[i*3+1] = p1.y + (p2.y - p1.y) * t + (Math.random() - 0.5) * 0.2;
-                    this.positions[i*3+2] = p1.z + (p2.z - p1.z) * t + (Math.random() - 0.5) * 0.2;
+                    // Tightly cluster the particles along the line to form a thick, glowing beam
+                    this.positions[i*3] = p1.x + (p2.x - p1.x) * t + (Math.random() - 0.5) * 0.05;
+                    this.positions[i*3+1] = p1.y + (p2.y - p1.y) * t + (Math.random() - 0.5) * 0.05;
+                    this.positions[i*3+2] = p1.z + (p2.z - p1.z) * t + (Math.random() - 0.5) * 0.05;
                     
                     this.colors[i*3] = 0.5; this.colors[i*3+1] = 0.8; this.colors[i*3+2] = 1.0;
-                    this.velocities[i*3] = (Math.random() - 0.5) * 1.0;
-                    this.velocities[i*3+1] = Math.random() * 2.0 - 1.0; // Float
-                    this.velocities[i*3+2] = (Math.random() - 0.5) * 1.0;
-                    this.sizes[i] = Math.random() * 10 + 5;
+                    
+                    // Very slow drift so they don't explode outward into a bloom
+                    this.velocities[i*3] = (Math.random() - 0.5) * 0.5;
+                    this.velocities[i*3+1] = (Math.random() - 0.5) * 0.5;
+                    this.velocities[i*3+2] = (Math.random() - 0.5) * 0.5;
+                    
+                    // Make them larger to fake line thickness
+                    this.sizes[i] = Math.random() * 15 + 10;
                     
                     spawned++;
                     if (spawned >= count) break;
