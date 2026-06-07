@@ -59,10 +59,11 @@ export const useWebRTC = (socket, userId, axios) => {
             if (axios) {
                 const { data } = await axios.get("/api/calls/turn-credentials");
                 if (data.success && data.credentials) {
+                    const credentialsArray = Array.isArray(data.credentials) ? data.credentials : [data.credentials];
                     iceServersConfig = {
                         iceServers: [
                             ...ICE_SERVERS.iceServers,
-                            data.credentials
+                            ...credentialsArray
                         ],
                         iceCandidatePoolSize: 10
                     };

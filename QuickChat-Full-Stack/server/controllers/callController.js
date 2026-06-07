@@ -92,11 +92,12 @@ export const getCallDetails = async (req, res) => {
 };
 
 // Generate TURN REST API credentials
-export const getTurnCredentials = (req, res) => {
+export const getTurnCredentials = async (req, res) => {
     try {
-        const turnSecret = process.env.TURN_SECRET;
-        const turnServerUrl = process.env.TURN_SERVER_URL;
-
+        const turnSecret = process.env.TURN_SECRET; // This will now hold the Metered API Key
+        const turnServerUrl = process.env.TURN_SERVER_URL; // This will now hold the Metered domain URL
+        
+        // If they still have Coturn URL, fallback to error, or just use Metered
         if (!turnSecret || !turnServerUrl) {
             return res.status(500).json({ 
                 success: false, 
@@ -104,26 +105,22 @@ export const getTurnCredentials = (req, res) => {
             });
         }
 
-        // Credentials are valid for 86400 seconds (24 hours)
-        const ttl = 86400;
-        const timestamp = Math.floor(Date.now() / 1000) + ttl;
-        const username = `${timestamp}:${req.user._id}`;
+        // Fetch from Metered API
+        const response = await fetch(`https://${turnServerUrl}/api/v1/turn/credentials?apiKey=${turnSecret}`);
         
-        // Generate HMAC-SHA1 signature
-        const hmac = crypto.createHmac("sha1", turnSecret);
-        hmac.update(username);
-        const password = hmac.digest("base64");
+        if (!response.ok) {
+            console.error(`Metered API error: ${response.status}`);
+            return res.status(500).json({ success: false, message: "Failed to fetch TURN credentials" });
+        }
+
+        const credentials = await response.json();
 
         res.json({
             success: true,
-            credentials: {
-                urls: turnServerUrl,
-                username,
-                credential: password
-            }
+            credentials // Metered returns an array of ICE servers
         });
     } catch (error) {
-        console.error("Error generating TURN credentials:", error.message);
+        console.error("Error fetching TURN credentials:", error.message);
         res.status(500).json({ success: false, message: error.message });
     }
 };
