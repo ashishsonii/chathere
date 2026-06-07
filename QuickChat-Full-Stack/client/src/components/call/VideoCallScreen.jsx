@@ -67,7 +67,10 @@ const VideoCallScreen = () => {
         });
     }, []);
 
-    const handleMouseMove = useCallback(() => {
+    const handlePointerMove = useCallback((e) => {
+        // Ignore touch movements so they don't conflict with the explicit tap-to-toggle
+        if (e.pointerType === 'touch') return;
+
         setControlsVisible(prev => {
             clearTimeout(hideTimerRef.current);
             hideTimerRef.current = setTimeout(() => {
@@ -175,7 +178,7 @@ const VideoCallScreen = () => {
             className="fixed inset-0 z-40 bg-black flex flex-col"
             style={forceLandscape ? landscapeStyle : {}}
             onClick={handleTapToggle}
-            onMouseMove={handleMouseMove}
+            onPointerMove={handlePointerMove}
         >
             
             {/* Remote Video (Full Screen) */}
