@@ -420,7 +420,7 @@ export class VFXEngine {
                 this.spawnParticles(40, 6);
             } else if (this.activeEffect === "open_palm") {
                 // Animate Graphic Shield Rotation
-                this.shieldMesh.rotation.z -= delta * 3.0; // Spin magic circle
+                this.shieldMesh.rotation.z -= dt * 3.0; // Spin magic circle
                 // Smoothly track hand
                 this.shieldMesh.position.lerp(this.targetPos, 0.3);
                 
