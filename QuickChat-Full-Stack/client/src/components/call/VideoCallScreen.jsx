@@ -259,7 +259,7 @@ const VideoCallScreen = () => {
                 </div>
 
                 {/* --- Zoom & Fit controls (right side, vertical) --- */}
-                <div className={`controls-bar absolute right-3 top-1/2 -translate-y-1/2 flex flex-col items-center gap-2 transition-opacity duration-300 ${controlsVisible ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
+                <div className={`controls-bar select-none absolute right-3 top-1/2 -translate-y-1/2 flex flex-col items-center gap-2 transition-opacity duration-300 ${controlsVisible ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
                     {/* Zoom In */}
                     <button 
                         onClick={() => setZoomLevel(prev => Math.min(prev + 0.15, 2.5))}
@@ -293,7 +293,7 @@ const VideoCallScreen = () => {
             </div>
 
             {/* Controls — auto-hides after 4s */}
-            <div className={`controls-bar absolute bottom-10 left-1/2 transform -translate-x-1/2 flex items-center gap-3 md:gap-5 bg-gray-900/80 px-5 md:px-7 py-3.5 rounded-full backdrop-blur-md shadow-2xl border border-white/10 transition-all duration-300 ${controlsVisible ? 'translate-y-0 opacity-100' : 'translate-y-20 opacity-0 pointer-events-none'}`}>
+            <div className={`controls-bar select-none absolute bottom-10 left-1/2 transform -translate-x-1/2 flex items-center gap-3 md:gap-5 bg-gray-900/80 px-5 md:px-7 py-3.5 rounded-full backdrop-blur-md shadow-2xl border border-white/10 transition-all duration-300 ${controlsVisible ? 'translate-y-0 opacity-100' : 'translate-y-20 opacity-0 pointer-events-none'}`}>
                 
                 {/* Mute Button */}
                 <button 

@@ -18,4 +18,16 @@ html, body, #root {
   overflow: hidden;
   position: fixed;
   inset: 0;
+  /* Prevent pull-to-refresh on mobile devices */
+  overscroll-behavior-y: none;
+  /* Remove default blue tap highlight on mobile buttons */
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Prevent text selection on UI elements */
+.no-select {
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
 }
