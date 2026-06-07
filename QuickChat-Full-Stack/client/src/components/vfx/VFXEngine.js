@@ -163,7 +163,11 @@ export class VFXEngine {
         video.muted = true;
         video.playsInline = true;
         video.crossOrigin = 'anonymous';
-        video.style.display = 'none'; // Hide it from user
+        video.style.position = 'absolute';
+        video.style.width = '1px';
+        video.style.height = '1px';
+        video.style.opacity = '0';
+        video.style.pointerEvents = 'none';
         document.body.appendChild(video); // Attach to DOM to prevent aggressive browser suspension
         this.shieldVideo = video;
         this.shieldVideo.play().catch(e => console.warn("Video autoplay blocked:", e));
@@ -441,9 +445,6 @@ export class VFXEngine {
                 this.shieldMesh.rotation.z -= dt * 3.0; // Spin magic circle
                 // Smoothly track hand
                 this.shieldMesh.position.lerp(this.targetPos, 0.3);
-                
-                // Add a very small amount of ambient magical sparks around the shield
-                this.spawnParticles(3, this.material.uniforms.uEffectType.value);
             } else {
                 this.spawnParticles(pCount, this.material.uniforms.uEffectType.value);
             }
