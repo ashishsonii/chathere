@@ -137,8 +137,8 @@ export class VFXEngine {
 
         // Setup Connected Webs (LineSegments)
         this.webGeometry = new THREE.BufferGeometry();
-        // 5 lines, 2 vertices each, 3 floats per vertex = 30 floats
-        this.webPositions = new Float32Array(30); 
+        // 5 fingers * 2 segments per finger * 2 vertices per segment = 20 vertices = 60 floats
+        this.webPositions = new Float32Array(60); 
         this.webGeometry.setAttribute('position', new THREE.BufferAttribute(this.webPositions, 3));
         
         this.webMaterial = new THREE.LineBasicMaterial({
@@ -158,6 +158,8 @@ export class VFXEngine {
         this.targetPos = new THREE.Vector3(0,0,0);
         this.hand1Points = null;
         this.hand2Points = null;
+        this.webBase1 = [new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()];
+        this.webBase2 = [new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()];
         this.clock = new THREE.Clock();
         this.animationId = null;
 
@@ -204,20 +206,11 @@ export class VFXEngine {
             this.hand2Points = hand2;
             this.material.uniforms.uEffectType.value = 6;
             
-            // Map the 5 fingers
+            // Map the 5 fingers to 3D world space
             for (let i = 0; i < 5; i++) {
-                const pos1 = this.mapScreenToWorld(hand1[i].x, hand1[i].y);
-                const pos2 = this.mapScreenToWorld(hand2[i].x, hand2[i].y);
-                
-                this.webPositions[i * 6] = pos1.x;
-                this.webPositions[i * 6 + 1] = pos1.y;
-                this.webPositions[i * 6 + 2] = pos1.z;
-                
-                this.webPositions[i * 6 + 3] = pos2.x;
-                this.webPositions[i * 6 + 4] = pos2.y;
-                this.webPositions[i * 6 + 5] = pos2.z;
+                this.webBase1[i].copy(this.mapScreenToWorld(hand1[i].x, hand1[i].y));
+                this.webBase2[i].copy(this.mapScreenToWorld(hand2[i].x, hand2[i].y));
             }
-            this.webGeometry.attributes.position.needsUpdate = true;
             return;
         } else {
             this.webLines.visible = false;
@@ -249,21 +242,16 @@ export class VFXEngine {
                 
                 // Base position with slight jitter
                 if (typeInt === 6) { // Web Sparkles along the lines
-                    // Pick a random finger pair line (0 to 4)
+                    // Pick a random finger pair (0 to 4)
                     const fIdx = Math.floor(Math.random() * 5);
                     const t = Math.random(); // Position along the line
                     
-                    const p1x = this.webPositions[fIdx * 6];
-                    const p1y = this.webPositions[fIdx * 6 + 1];
-                    const p1z = this.webPositions[fIdx * 6 + 2];
-                    
-                    const p2x = this.webPositions[fIdx * 6 + 3];
-                    const p2y = this.webPositions[fIdx * 6 + 4];
-                    const p2z = this.webPositions[fIdx * 6 + 5];
+                    const p1 = this.webBase1[fIdx];
+                    const p2 = this.webBase2[fIdx];
 
-                    this.positions[i*3] = p1x + (p2x - p1x) * t + (Math.random() - 0.5) * 0.1;
-                    this.positions[i*3+1] = p1y + (p2y - p1y) * t + (Math.random() - 0.5) * 0.1;
-                    this.positions[i*3+2] = p1z + (p2z - p1z) * t + (Math.random() - 0.5) * 0.1;
+                    this.positions[i*3] = p1.x + (p2.x - p1.x) * t + (Math.random() - 0.5) * 0.2;
+                    this.positions[i*3+1] = p1.y + (p2.y - p1.y) * t + (Math.random() - 0.5) * 0.2;
+                    this.positions[i*3+2] = p1.z + (p2.z - p1.z) * t + (Math.random() - 0.5) * 0.2;
                     
                     this.colors[i*3] = 0.5; this.colors[i*3+1] = 0.8; this.colors[i*3+2] = 1.0;
                     this.velocities[i*3] = (Math.random() - 0.5) * 1.0;
@@ -361,6 +349,38 @@ export class VFXEngine {
             if (this.activeEffect === "open_palm") pCount = 25; // Dense sparkling shield
             
             if (this.activeEffect === "connect_webs") {
+                // Animate jagged lightning bolts for each finger
+                for (let i = 0; i < 5; i++) {
+                    const p1 = this.webBase1[i];
+                    const p2 = this.webBase2[i];
+                    
+                    // Create a chaotic midpoint that snaps around
+                    const midX = (p1.x + p2.x) / 2 + (Math.random() - 0.5) * 1.5;
+                    const midY = (p1.y + p2.y) / 2 + (Math.random() - 0.5) * 1.5;
+                    const midZ = (p1.z + p2.z) / 2 + (Math.random() - 0.5) * 0.5;
+
+                    const idx = i * 12; // 4 vertices per finger * 3 floats
+
+                    // Segment 1: Hand 1 -> Midpoint
+                    this.webPositions[idx] = p1.x;
+                    this.webPositions[idx+1] = p1.y;
+                    this.webPositions[idx+2] = p1.z;
+                    
+                    this.webPositions[idx+3] = midX;
+                    this.webPositions[idx+4] = midY;
+                    this.webPositions[idx+5] = midZ;
+                    
+                    // Segment 2: Midpoint -> Hand 2
+                    this.webPositions[idx+6] = midX;
+                    this.webPositions[idx+7] = midY;
+                    this.webPositions[idx+8] = midZ;
+                    
+                    this.webPositions[idx+9] = p2.x;
+                    this.webPositions[idx+10] = p2.y;
+                    this.webPositions[idx+11] = p2.z;
+                }
+                this.webGeometry.attributes.position.needsUpdate = true;
+
                 // Spawn dense sparkles along the web lines
                 this.spawnParticles(30, 6);
             } else {

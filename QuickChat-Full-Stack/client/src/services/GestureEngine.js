@@ -65,30 +65,25 @@ export class GestureEngine {
                     if (results.gestures.length > 0) {
                         
                         // --- TWO HANDS LOGIC (Connected Webs) ---
-                        if (results.landmarks.length === 2 && results.gestures.length === 2) {
-                            const gesture1 = results.gestures[0][0].categoryName;
-                            const gesture2 = results.gestures[1][0].categoryName;
+                        if (results.landmarks.length === 2) {
+                            // Extract the 5 fingertips for both hands: [Thumb (4), Index (8), Middle (12), Ring (16), Pinky (20)]
+                            const h1 = results.landmarks[0];
+                            const h2 = results.landmarks[1];
                             
-                            if (gesture1 === "Open_Palm" && gesture2 === "Open_Palm") {
-                                // Extract the 5 fingertips for both hands: [Thumb (4), Index (8), Middle (12), Ring (16), Pinky (20)]
-                                const h1 = results.landmarks[0];
-                                const h2 = results.landmarks[1];
-                                
-                                const hand1 = [h1[4], h1[8], h1[12], h1[16], h1[20]];
-                                const hand2 = [h2[4], h2[8], h2[12], h2[16], h2[20]];
-                                
-                                this.currentGesture = "connect_webs";
-                                this.debounceFrames = 5;
-                                this.lastEventPayload = {
-                                    gesture: "connect_webs",
-                                    x: 0, y: 0, z: 0, // Dummy
-                                    hand1: hand1,
-                                    hand2: hand2
-                                };
-                                onGesture(this.lastEventPayload);
-                                this.animationFrameId = requestAnimationFrame(renderLoop);
-                                return; // Skip single hand processing
-                            }
+                            const hand1 = [h1[4], h1[8], h1[12], h1[16], h1[20]];
+                            const hand2 = [h2[4], h2[8], h2[12], h2[16], h2[20]];
+                            
+                            this.currentGesture = "connect_webs";
+                            this.debounceFrames = 5;
+                            this.lastEventPayload = {
+                                gesture: "connect_webs",
+                                x: 0, y: 0, z: 0, // Dummy
+                                hand1: hand1,
+                                hand2: hand2
+                            };
+                            onGesture(this.lastEventPayload);
+                            this.animationFrameId = requestAnimationFrame(renderLoop);
+                            return; // Skip single hand processing
                         }
 
                         // --- SINGLE HAND LOGIC ---

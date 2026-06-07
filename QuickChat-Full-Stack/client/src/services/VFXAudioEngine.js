@@ -53,6 +53,9 @@ class VFXAudioEngine {
             case "thumbs_up":
                 this.playBurst();
                 break;
+            case "connect_webs":
+                this.playCracklingElectricity();
+                break;
         }
     }
 
@@ -177,6 +180,40 @@ class VFXAudioEngine {
         setTimeout(() => {
             if (this.activeEffect === "thumbs_up") this.stopEffect();
         }, 500);
+    }
+
+    playCracklingElectricity() {
+        // Raw high-frequency sawtooth heavily modulated by a rapid square wave LFO
+        // This simulates the snapping and popping of high voltage arcs.
+        const osc = this.ctx.createOscillator();
+        osc.type = 'sawtooth';
+        osc.frequency.value = 400;
+
+        const lfo = this.ctx.createOscillator();
+        lfo.type = 'square';
+        lfo.frequency.value = 40; // 40 snaps per second
+
+        const lfoGain = this.ctx.createGain();
+        lfoGain.gain.value = 1000;
+
+        lfo.connect(lfoGain);
+        lfoGain.connect(osc.frequency);
+
+        const filter = this.ctx.createBiquadFilter();
+        filter.type = 'highpass';
+        filter.frequency.value = 2000; // Keep it sounding sharp
+
+        const gainNode = this.ctx.createGain();
+        gainNode.gain.value = 0.05; // Keep it quiet, high frequency is piercing
+
+        osc.connect(filter);
+        filter.connect(gainNode);
+        gainNode.connect(this.ctx.destination);
+
+        osc.start();
+        lfo.start();
+
+        this.activeNodes.push(osc, lfo, filter, gainNode);
     }
 }
 
