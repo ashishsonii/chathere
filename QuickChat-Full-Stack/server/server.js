@@ -85,7 +85,8 @@ io.on("connection", async (socket)=>{
 })
 
 // Middleware setup
-app.use(express.json({limit: "4mb"}));
+// Increased limit to 20mb to prevent 413 Payload Too Large errors on high-res image uploads
+app.use(express.json({limit: "20mb"}));
 
 
 app.use(cors({
