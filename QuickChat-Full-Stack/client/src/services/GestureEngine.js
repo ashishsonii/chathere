@@ -1,13 +1,11 @@
 import { FilesetResolver, GestureRecognizer } from "@mediapipe/tasks-vision";
 
-// Smooth out gesture detection to prevent flickering
-const GESTURE_COOLDOWN_MS = 1000; 
+// Stream gesture coordinates continuously
 
 export class GestureEngine {
     constructor() {
         this.recognizer = null;
         this.isRunning = false;
-        this.lastGestureTime = 0;
         this.currentGesture = null;
         this.animationFrameId = null;
     }
@@ -68,21 +66,22 @@ export class GestureEngine {
                         if (gestureName === "Thumb_Up") mappedGesture = "thumbs_up";
                         if (gestureName === "ILoveYou" || gestureName === "Pointing_Up") mappedGesture = "open_palm"; // Fallback for 5th gesture
 
-                        const now = Date.now();
                         if (mappedGesture && score > 0.6) {
-                            // Only trigger if enough time has passed to prevent spamming
-                            if (now - this.lastGestureTime > GESTURE_COOLDOWN_MS || this.currentGesture !== mappedGesture) {
-                                this.lastGestureTime = now;
-                                this.currentGesture = mappedGesture;
-                                
-                                onGesture({
-                                    gesture: mappedGesture,
-                                    x: landmark.x,
-                                    y: landmark.y,
-                                    z: landmark.z
-                                });
-                            }
+                            this.currentGesture = mappedGesture;
+                            onGesture({
+                                gesture: mappedGesture,
+                                x: landmark.x,
+                                y: landmark.y,
+                                z: landmark.z
+                            });
+                        } else if (this.currentGesture !== null) {
+                            this.currentGesture = null;
+                            onGesture({ gesture: "none", x: 0, y: 0, z: 0 });
                         }
+                    } else if (this.currentGesture !== null) {
+                        // Hand was lowered or gesture stopped
+                        this.currentGesture = null;
+                        onGesture({ gesture: "none", x: 0, y: 0, z: 0 });
                     }
                 } catch (e) {
                     console.warn("[GestureEngine] Detection error:", e);

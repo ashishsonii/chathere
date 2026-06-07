@@ -138,11 +138,12 @@ export class VFXEngine {
     }
 
     triggerEffect(gesture, x, y) {
+        if (gesture === "none") {
+            this.activeEffect = null;
+            return;
+        }
+
         // Map 0.0-1.0 screen coordinates to 3D world space coordinates
-        // Note: MediaPipe x is inverted in some cameras, but we'll assume standardized 0-1 here.
-        // Screen top-left is 0,0, bottom-right is 1,1.
-        // Three.js center is 0,0.
-        
         const vec = new THREE.Vector3(
             (x * 2) - 1,
             -(y * 2) + 1,
@@ -154,20 +155,17 @@ export class VFXEngine {
         this.targetPos.copy(this.camera.position).add(dir.multiplyScalar(distance));
 
         let typeInt = 0;
-        let pCount = 50; // Particles to spawn per frame
-
         switch(gesture) {
             case "closed_fist": typeInt = 1; break;
-            case "two_finger": typeInt = 2; pCount = 20; break;
+            case "two_finger": typeInt = 2; break;
             case "hand_raise": typeInt = 3; break;
-            case "thumbs_up": typeInt = 4; pCount = 150; break;
+            case "thumbs_up": typeInt = 4; break;
             case "open_palm": typeInt = 0; break;
             default: return;
         }
 
         this.material.uniforms.uEffectType.value = typeInt;
         this.activeEffect = gesture;
-        this.spawnParticles(pCount, typeInt);
     }
 
     spawnParticles(count, typeInt) {
@@ -231,6 +229,15 @@ export class VFXEngine {
 
         if (needsUpdate) {
             this.particleSystem.geometry.attributes.life.needsUpdate = true;
+        }
+
+        // Continuously emit particles if an effect is active
+        if (this.activeEffect) {
+            let pCount = 5; // Default particles per frame (5 * 60fps = 300 particles/sec)
+            if (this.activeEffect === "thumbs_up") pCount = 15;
+            if (this.activeEffect === "two_finger") pCount = 2;
+            
+            this.spawnParticles(pCount, this.material.uniforms.uEffectType.value);
         }
 
         this.renderer.render(this.scene, this.camera);
