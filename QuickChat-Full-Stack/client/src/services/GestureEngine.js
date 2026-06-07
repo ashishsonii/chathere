@@ -8,6 +8,7 @@ export class GestureEngine {
         this.isRunning = false;
         this.currentGesture = null;
         this.animationFrameId = null;
+        this.scaleHistory = [];
     }
 
     async initialize() {
@@ -55,8 +56,25 @@ export class GestureEngine {
                         const gestureName = results.gestures[0][0].categoryName;
                         const score = results.gestures[0][0].score;
                         
-                        // Use the wrist landmark (index 0) as the spawn position
-                        const landmark = results.landmarks[0][0]; 
+                        // Use the wrist landmark (index 0) and middle finger MCP (index 9)
+                        const wrist = results.landmarks[0][0];
+                        const mcp = results.landmarks[0][9];
+                        
+                        // Calculate 2D distance between wrist and middle MCP as a proxy for scale
+                        const currentScale = Math.sqrt(Math.pow(wrist.x - mcp.x, 2) + Math.pow(wrist.y - mcp.y, 2));
+                        
+                        const now = performance.now();
+                        this.scaleHistory.push({ time: now, scale: currentScale });
+                        if (this.scaleHistory.length > 10) this.scaleHistory.shift();
+
+                        let isPushing = false;
+                        if (this.scaleHistory.length >= 8) {
+                            const oldestScale = this.scaleHistory[0].scale;
+                            // If scale increased by > 20% over the last ~8-10 frames, it's a push toward camera
+                            if (currentScale > oldestScale * 1.20) {
+                                isPushing = true;
+                            }
+                        }
                         
                         // Map MediaPipe standard gestures to our VFX triggers
                         let mappedGesture = null;
@@ -66,13 +84,18 @@ export class GestureEngine {
                         if (gestureName === "Thumb_Up") mappedGesture = "thumbs_up";
                         if (gestureName === "ILoveYou" || gestureName === "Pointing_Up") mappedGesture = "open_palm"; // Fallback for 5th gesture
 
+                        // Override with the super power throw if pushing
+                        if (isPushing && (gestureName === "Open_Palm" || gestureName === "Closed_Fist")) {
+                            mappedGesture = "fire_throw";
+                        }
+
                         if (mappedGesture && score > 0.6) {
                             this.currentGesture = mappedGesture;
                             onGesture({
                                 gesture: mappedGesture,
-                                x: landmark.x,
-                                y: landmark.y,
-                                z: landmark.z
+                                x: wrist.x,
+                                y: wrist.y,
+                                z: wrist.z
                             });
                         } else if (this.currentGesture !== null) {
                             this.currentGesture = null;

@@ -28,6 +28,8 @@ void main() {
         pos.x += sin(uTime + pos.y) * 0.2;
     } else if (uEffectType == 4) { // Burst (Thumbs Up)
         pos += velocity * (uTime * 5.0);
+    } else if (uEffectType == 5) { // Fire Throw (Push)
+        pos += velocity * (uTime * 15.0);
     } else { // Shield (Open Palm)
         pos += normalize(velocity) * sin(uTime * 2.0) * 0.1;
     }
@@ -59,6 +61,9 @@ void main() {
     if (uEffectType == 1) { // Fire
         finalColor = mix(vec3(1.0, 1.0, 0.0), vec3(1.0, 0.0, 0.0), vLife);
         alpha *= 1.5;
+    } else if (uEffectType == 5) { // Fire Throw
+        finalColor = mix(vec3(1.0, 0.8, 0.0), vec3(1.0, 0.2, 0.0), vLife);
+        alpha *= 2.0;
     } else if (uEffectType == 2) { // Lightning
         finalColor = vec3(0.5, 0.8, 1.0);
         if (ll < 0.1) finalColor = vec3(1.0); // Hot core
@@ -160,6 +165,7 @@ export class VFXEngine {
             case "two_finger": typeInt = 2; break;
             case "hand_raise": typeInt = 3; break;
             case "thumbs_up": typeInt = 4; break;
+            case "fire_throw": typeInt = 5; break;
             case "open_palm": typeInt = 0; break;
             default: return;
         }
@@ -186,6 +192,12 @@ export class VFXEngine {
                     this.velocities[i*3+1] = Math.random() * 3.0 + 1.0; // Upwards
                     this.velocities[i*3+2] = (Math.random() - 0.5) * 2.0;
                     this.sizes[i] = Math.random() * 40 + 20;
+                } else if (typeInt === 5) { // Fire Throw
+                    this.colors[i*3] = 1.0; this.colors[i*3+1] = 0.6; this.colors[i*3+2] = 0.1;
+                    this.velocities[i*3] = (Math.random() - 0.5) * 2.0;
+                    this.velocities[i*3+1] = (Math.random() - 0.5) * 2.0;
+                    this.velocities[i*3+2] = Math.random() * 5.0 + 3.0; // Fast towards camera (+Z)
+                    this.sizes[i] = Math.random() * 60 + 30; // Larger particles
                 } else if (typeInt === 2) { // Lightning
                     this.colors[i*3] = 0.5; this.colors[i*3+1] = 0.8; this.colors[i*3+2] = 1.0;
                     this.velocities[i*3] = (Math.random() - 0.5) * 5.0;
@@ -236,6 +248,7 @@ export class VFXEngine {
             let pCount = 5; // Default particles per frame (5 * 60fps = 300 particles/sec)
             if (this.activeEffect === "thumbs_up") pCount = 15;
             if (this.activeEffect === "two_finger") pCount = 2;
+            if (this.activeEffect === "fire_throw") pCount = 20;
             
             this.spawnParticles(pCount, this.material.uniforms.uEffectType.value);
         }

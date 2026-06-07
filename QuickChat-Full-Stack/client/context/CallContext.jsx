@@ -15,6 +15,7 @@ export const CallProvider = ({ children }) => {
     const [callDuration, setCallDuration] = useState(0);
     const [remoteIsScreenSharing, setRemoteIsScreenSharing] = useState(false);
     const [lastGestureEvent, setLastGestureEvent] = useState(null);
+    const [vfxModeEnabled, setVfxModeEnabled] = useState(false); // Toggle for VFX system
 
     const { playRingtone, stopRingtone, playRingback, stopRingback } = useCallSounds();
     const {
@@ -140,6 +141,7 @@ export const CallProvider = ({ children }) => {
         setCallDuration(0);
         setRemoteIsScreenSharing(false);
         setLastGestureEvent(null);
+        setVfxModeEnabled(false);
     }, [cleanupWebRTC, stopRingtone, stopRingback]);
 
     // Wrapper around webrtcToggleScreenShare that also signals the remote peer
@@ -303,7 +305,9 @@ export const CallProvider = ({ children }) => {
         toggleScreenShare,
         changeAudioOutput,
         lastGestureEvent,
-        sendGestureEvent
+        sendGestureEvent,
+        vfxModeEnabled,
+        toggleVfxMode: () => setVfxModeEnabled(prev => !prev)
     };
 
     return (
