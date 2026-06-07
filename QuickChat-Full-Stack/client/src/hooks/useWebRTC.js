@@ -160,10 +160,7 @@ export const useWebRTC = (socket, userId, axios) => {
         if (!pc) return;
 
         try {
-            const offer = await pc.createOffer({
-                offerToReceiveAudio: true,
-                offerToReceiveVideo: true
-            });
+            const offer = await pc.createOffer();
             await pc.setLocalDescription(offer);
             
             socket.emit("call:sdp-offer", {
@@ -262,8 +259,8 @@ export const useWebRTC = (socket, userId, axios) => {
                 autoGainControl: true
             },
             video: type === "video" ? {
-                width: { ideal: 1920, max: 3840 },
-                height: { ideal: 1080, max: 2160 },
+                width: { ideal: 1280, max: 1920 },
+                height: { ideal: 720, max: 1080 },
                 frameRate: { ideal: 30, max: 60 },
                 facingMode: "user"
             } : false

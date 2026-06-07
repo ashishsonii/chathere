@@ -262,8 +262,7 @@ const VideoCallScreen = () => {
                                 autoPlay 
                                 playsInline 
                                 muted 
-                                className="w-full h-full object-cover" 
-                                style={isScreenSharing ? {} : { transform: "scaleX(-1)" }}
+                                className={`w-full h-full object-cover ${!isScreenSharing ? '-scale-x-100' : ''}`}
                             />
                         </>
                     ) : (
