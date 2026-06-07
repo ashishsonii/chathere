@@ -180,7 +180,7 @@ const ChatContainer = () => {
                             </div>
                         </div>
                     ))}
-                    {typingStatus[selectedUser?._id] && (
+                    {typingStatus[selectedUser?._id] && selectedUser?._id !== authUser?._id && (
                         <div className="flex items-end gap-2 justify-end flex-row-reverse">
                             <div className="p-3 px-4 w-[70px] md:text-sm font-light rounded-lg mb-8 bg-violet-500/30 text-white rounded-bl-none flex items-center justify-between">
                                 <span className="w-1.5 h-1.5 bg-gray-300 rounded-full animate-bounce" style={{ animationDelay: '0s' }}></span>
