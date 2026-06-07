@@ -1,11 +1,14 @@
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import toast from 'react-hot-toast';
 
 const ICE_SERVERS = {
     iceServers: [
         { urls: 'stun:stun.l.google.com:19302' },
-        { urls: 'stun:stun1.l.google.com:19302' }
-    ]
+        { urls: 'stun:stun1.l.google.com:19302' },
+        { urls: 'stun:stun2.l.google.com:19302' },
+        { urls: 'stun:stun3.l.google.com:19302' }
+    ],
+    iceCandidatePoolSize: 10
 };
 
 export const useWebRTC = (socket, userId, axios) => {
@@ -15,14 +18,29 @@ export const useWebRTC = (socket, userId, axios) => {
     const [isCameraOff, setIsCameraOff] = useState(false);
     
     const peerConnection = useRef(null);
-    const pendingCandidates = useRef([]); // Buffer for ICE candidates received before answer
+    const pendingCandidates = useRef([]);
+    // localStreamRef is set SYNCHRONOUSLY in startLocalStream, before React
+    // batches the setState. This guarantees initPeerConnection always sees
+    // the latest stream even when called in the same tick as startLocalStream.
+    const localStreamRef = useRef(null);
 
-    // Initialize RTCPeerConnection
-    const initPeerConnection = useCallback(async (callId, remoteUserId, isInitiator) => {
+    // Initialize RTCPeerConnection.
+    // `explicitStream` lets callers pass the stream directly to bypass any
+    // stale-closure issues (e.g. when acceptCall calls startLocalStream then
+    // immediately calls initPeerConnection in the same synchronous block).
+    const initPeerConnection = useCallback(async (callId, remoteUserId, isInitiator, explicitStream) => {
+        // Clean up any prior connection fully before creating a new one
         if (peerConnection.current) {
+            peerConnection.current.ontrack = null;
+            peerConnection.current.onicecandidate = null;
+            peerConnection.current.oniceconnectionstatechange = null;
+            peerConnection.current.onconnectionstatechange = null;
             peerConnection.current.close();
+            peerConnection.current = null;
         }
+        pendingCandidates.current = [];
 
+        // Fetch TURN credentials for NAT traversal reliability
         let iceServersConfig = ICE_SERVERS;
         try {
             if (axios) {
@@ -32,18 +50,19 @@ export const useWebRTC = (socket, userId, axios) => {
                         iceServers: [
                             ...ICE_SERVERS.iceServers,
                             data.credentials
-                        ]
+                        ],
+                        iceCandidatePoolSize: 10
                     };
                 }
             }
         } catch (error) {
-            console.error("Failed to fetch TURN credentials, falling back to STUN", error);
+            console.warn("[WebRTC] TURN credentials unavailable, using STUN only:", error.message);
         }
 
         const pc = new RTCPeerConnection(iceServersConfig);
         peerConnection.current = pc;
 
-        // 1. Handle local ICE candidates
+        // 1. Relay local ICE candidates to remote peer via signaling
         pc.onicecandidate = (event) => {
             if (event.candidate) {
                 socket.emit("call:ice-candidate", {
@@ -54,25 +73,46 @@ export const useWebRTC = (socket, userId, axios) => {
             }
         };
 
-        // 2. Handle remote stream (when track is received)
+        // 2. When remote tracks arrive, wrap in a NEW MediaStream so React
+        //    always detects the state change (even when a second track arrives
+        //    on the same underlying stream object).
         pc.ontrack = (event) => {
-            // Always create a new MediaStream to ensure React detects the state change
-            // when new tracks are added to the existing stream sequentially.
-            setRemoteStream(new MediaStream(event.streams[0].getTracks()));
+            if (event.streams && event.streams[0]) {
+                setRemoteStream(new MediaStream(event.streams[0].getTracks()));
+            }
         };
 
-        // 3. Add local tracks to peer connection if we already have a stream
-        if (localStream) {
-            localStream.getTracks().forEach(track => {
-                pc.addTrack(track, localStream);
+        // 3. ICE connection state monitoring — auto-restart on failure
+        pc.oniceconnectionstatechange = () => {
+            const state = pc.iceConnectionState;
+            console.log(`[WebRTC] ICE state: ${state}`);
+            if (state === 'failed') {
+                console.warn("[WebRTC] ICE failed — attempting ICE restart");
+                pc.restartIce();
+            }
+        };
+
+        pc.onconnectionstatechange = () => {
+            console.log(`[WebRTC] Connection state: ${pc.connectionState}`);
+        };
+
+        // 4. Add local media tracks to the peer connection.
+        //    Priority: explicit param > synchronous ref > React state
+        const mediaStream = explicitStream || localStreamRef.current;
+        if (mediaStream) {
+            mediaStream.getTracks().forEach(track => {
+                pc.addTrack(track, mediaStream);
             });
+            console.log(`[WebRTC] Added ${mediaStream.getTracks().length} local track(s)`);
+        } else {
+            console.warn("[WebRTC] No local stream available — remote peer will not receive media!");
         }
 
         return pc;
-    }, [localStream, socket, axios]);
+    }, [socket, axios]); // localStream deliberately excluded — we use the ref
 
-    // Create an offer (Caller)
-    const createOffer = async (callId, remoteUserId) => {
+    // Create an SDP offer (caller side)
+    const createOffer = useCallback(async (callId, remoteUserId) => {
         const pc = peerConnection.current;
         if (!pc) return;
 
@@ -86,15 +126,15 @@ export const useWebRTC = (socket, userId, axios) => {
             socket.emit("call:sdp-offer", {
                 callId,
                 to: remoteUserId,
-                offer
+                offer: pc.localDescription
             });
         } catch (error) {
-            console.error("Error creating offer:", error);
+            console.error("[WebRTC] Error creating offer:", error);
         }
-    };
+    }, [socket]);
 
-    // Create an answer (Receiver)
-    const createAnswer = async (callId, remoteUserId, offer) => {
+    // Create an SDP answer (receiver side)
+    const createAnswer = useCallback(async (callId, remoteUserId, offer) => {
         const pc = peerConnection.current;
         if (!pc) return;
 
@@ -106,123 +146,154 @@ export const useWebRTC = (socket, userId, axios) => {
             socket.emit("call:sdp-answer", {
                 callId,
                 to: remoteUserId,
-                answer
+                answer: pc.localDescription
             });
 
-            // Process any pending candidates that arrived before the offer was set
-            pendingCandidates.current.forEach(candidate => {
-                pc.addIceCandidate(new RTCIceCandidate(candidate)).catch(console.error);
-            });
-            pendingCandidates.current = [];
-
+            // Flush any ICE candidates that arrived before the remote description
+            if (pendingCandidates.current.length > 0) {
+                console.log(`[WebRTC] Flushing ${pendingCandidates.current.length} buffered ICE candidates`);
+                for (const c of pendingCandidates.current) {
+                    try { await pc.addIceCandidate(new RTCIceCandidate(c)); }
+                    catch (e) { console.warn("[WebRTC] Buffered candidate failed:", e.message); }
+                }
+                pendingCandidates.current = [];
+            }
         } catch (error) {
-            console.error("Error creating answer:", error);
+            console.error("[WebRTC] Error creating answer:", error);
         }
-    };
+    }, [socket]);
 
-    // Handle remote answer
-    const handleAnswer = async (answer) => {
+    // Handle the remote SDP answer (caller receives this)
+    const handleAnswer = useCallback(async (answer) => {
         const pc = peerConnection.current;
         if (!pc) return;
+
         try {
+            if (pc.signalingState !== "have-local-offer") {
+                console.warn(`[WebRTC] Ignoring answer — wrong state: ${pc.signalingState}`);
+                return;
+            }
             await pc.setRemoteDescription(new RTCSessionDescription(answer));
-            
-            // Process any pending candidates that arrived before the answer was set
-            pendingCandidates.current.forEach(candidate => {
-                pc.addIceCandidate(new RTCIceCandidate(candidate)).catch(console.error);
-            });
-            pendingCandidates.current = [];
-        } catch (error) {
-            console.error("Error handling answer:", error);
-        }
-    };
 
-    // Handle incoming ICE candidate
-    const handleIceCandidate = async (candidate) => {
+            // Flush buffered ICE candidates
+            if (pendingCandidates.current.length > 0) {
+                console.log(`[WebRTC] Flushing ${pendingCandidates.current.length} buffered ICE candidates`);
+                for (const c of pendingCandidates.current) {
+                    try { await pc.addIceCandidate(new RTCIceCandidate(c)); }
+                    catch (e) { console.warn("[WebRTC] Buffered candidate failed:", e.message); }
+                }
+                pendingCandidates.current = [];
+            }
+        } catch (error) {
+            console.error("[WebRTC] Error handling answer:", error);
+        }
+    }, []);
+
+    // Handle incoming ICE candidate — add immediately or buffer
+    const handleIceCandidate = useCallback(async (candidate) => {
         const pc = peerConnection.current;
         if (!pc) return;
 
         try {
-            // If remote description is set, add immediately
-            if (pc.remoteDescription) {
+            if (pc.remoteDescription && pc.remoteDescription.type) {
                 await pc.addIceCandidate(new RTCIceCandidate(candidate));
             } else {
-                // Otherwise buffer it
                 pendingCandidates.current.push(candidate);
             }
         } catch (error) {
-            console.error("Error adding ICE candidate:", error);
+            console.warn("[WebRTC] ICE candidate error:", error.message);
         }
-    };
+    }, []);
 
-    // Get user media
+    // Acquire local camera/microphone
     const startLocalStream = async (type) => {
+        // Stop any prior stream first to release hardware
+        if (localStreamRef.current) {
+            localStreamRef.current.getTracks().forEach(t => t.stop());
+        }
+
+        const constraints = {
+            audio: {
+                echoCancellation: true,
+                noiseSuppression: true,
+                autoGainControl: true
+            },
+            video: type === "video" ? {
+                width: { ideal: 1280, max: 1920 },
+                height: { ideal: 720, max: 1080 },
+                frameRate: { ideal: 30, max: 30 },
+                facingMode: "user"
+            } : false
+        };
+
+        let stream;
         try {
-            const stream = await navigator.mediaDevices.getUserMedia({
-                audio: {
-                    echoCancellation: true,
-                    noiseSuppression: true,
-                    autoGainControl: true
-                },
-                video: type === "video" ? {
-                    width: { ideal: 1280 },
-                    height: { ideal: 720 },
-                    facingMode: "user"
-                } : false
-            });
-            setLocalStream(stream);
-            return stream;
-        } catch (error) {
-            console.warn("First getUserMedia attempt failed, trying fallback:", error);
+            stream = await navigator.mediaDevices.getUserMedia(constraints);
+        } catch (primaryErr) {
+            console.warn("[WebRTC] Primary getUserMedia failed, trying fallback:", primaryErr.name);
             try {
-                // Fallback without strict constraints
-                const fallbackStream = await navigator.mediaDevices.getUserMedia({
+                // Minimal constraints — works on the widest range of devices/OS
+                stream = await navigator.mediaDevices.getUserMedia({
                     audio: true,
                     video: type === "video"
                 });
-                setLocalStream(fallbackStream);
-                return fallbackStream;
-            } catch (fallbackError) {
-                console.error("Error accessing media devices:", fallbackError);
-                toast.error(`Media access failed: ${fallbackError.name || fallbackError.message}. Check permissions or if another app is using the mic/camera.`);
-                throw fallbackError;
+            } catch (fallbackErr) {
+                console.error("[WebRTC] Media access totally failed:", fallbackErr);
+                const reason = fallbackErr.name === 'NotAllowedError'
+                    ? 'Permission denied — please allow camera/mic in browser settings.'
+                    : fallbackErr.message;
+                toast.error(`Media access failed: ${reason}`);
+                throw fallbackErr;
             }
         }
+
+        // Set the ref SYNCHRONOUSLY so it is available in the same tick
+        localStreamRef.current = stream;
+        // Queue the React state update (will apply on next render)
+        setLocalStream(stream);
+        return stream;
     };
 
-    const stopLocalStream = () => {
-        if (localStream) {
-            localStream.getTracks().forEach(track => track.stop());
-            setLocalStream(null);
+    const stopLocalStream = useCallback(() => {
+        if (localStreamRef.current) {
+            localStreamRef.current.getTracks().forEach(t => t.stop());
+            localStreamRef.current = null;
         }
-    };
+        setLocalStream(null);
+    }, []);
 
-    const toggleMute = () => {
-        if (localStream) {
-            const audioTrack = localStream.getAudioTracks()[0];
+    const toggleMute = useCallback(() => {
+        const stream = localStreamRef.current;
+        if (stream) {
+            const audioTrack = stream.getAudioTracks()[0];
             if (audioTrack) {
                 audioTrack.enabled = !audioTrack.enabled;
                 setIsMuted(!audioTrack.enabled);
                 return !audioTrack.enabled;
             }
         }
-        return isMuted;
-    };
+        return false;
+    }, []);
 
-    const toggleCamera = () => {
-        if (localStream) {
-            const videoTrack = localStream.getVideoTracks()[0];
+    const toggleCamera = useCallback(() => {
+        const stream = localStreamRef.current;
+        if (stream) {
+            const videoTrack = stream.getVideoTracks()[0];
             if (videoTrack) {
                 videoTrack.enabled = !videoTrack.enabled;
                 setIsCameraOff(!videoTrack.enabled);
                 return !videoTrack.enabled;
             }
         }
-        return isCameraOff;
-    };
+        return false;
+    }, []);
 
-    const cleanup = () => {
+    const cleanup = useCallback(() => {
         if (peerConnection.current) {
+            peerConnection.current.ontrack = null;
+            peerConnection.current.onicecandidate = null;
+            peerConnection.current.oniceconnectionstatechange = null;
+            peerConnection.current.onconnectionstatechange = null;
             peerConnection.current.close();
             peerConnection.current = null;
         }
@@ -231,7 +302,7 @@ export const useWebRTC = (socket, userId, axios) => {
         setIsMuted(false);
         setIsCameraOff(false);
         pendingCandidates.current = [];
-    };
+    }, [stopLocalStream]);
 
     return {
         localStream,

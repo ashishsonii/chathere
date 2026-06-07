@@ -1,4 +1,4 @@
-import React, { useContext, useEffect, useRef } from 'react';
+import React, { useContext, useEffect, useRef, useCallback } from 'react';
 import { CallContext } from '../../../context/CallContext';
 
 const formatDuration = (seconds) => {
@@ -24,19 +24,41 @@ const VideoCallScreen = () => {
     const localVideoRef = useRef(null);
     const remoteVideoRef = useRef(null);
 
+    // Bind local stream to local video element
     useEffect(() => {
         if (localVideoRef.current && localStream) {
             localVideoRef.current.srcObject = localStream;
-            localVideoRef.current.play().catch(e => console.log("Local video play failed:", e));
+            localVideoRef.current.play().catch(() => {});
         }
     }, [localStream]);
 
+    // Bind remote stream to remote video element.
+    // Uses a ref callback as well for when the element mounts after the stream exists.
     useEffect(() => {
         if (remoteVideoRef.current && remoteStream) {
             remoteVideoRef.current.srcObject = remoteStream;
-            remoteVideoRef.current.play().catch(e => console.log("Video play failed:", e));
+            remoteVideoRef.current.play().catch(() => {});
         }
     }, [remoteStream]);
+
+    // Ref callback for the remote <video> — handles the case where
+    // remoteStream is already set when the element first mounts.
+    const setRemoteVideoRef = useCallback((el) => {
+        remoteVideoRef.current = el;
+        if (el && remoteStream) {
+            el.srcObject = remoteStream;
+            el.play().catch(() => {});
+        }
+    }, [remoteStream]);
+
+    // Same for local video
+    const setLocalVideoRef = useCallback((el) => {
+        localVideoRef.current = el;
+        if (el && localStream) {
+            el.srcObject = localStream;
+            el.play().catch(() => {});
+        }
+    }, [localStream]);
 
     if (callState !== "connected" || currentCall?.type !== "video") return null;
 
@@ -47,14 +69,17 @@ const VideoCallScreen = () => {
             <div className="flex-1 relative w-full h-full">
                 {remoteStream ? (
                     <video 
-                        ref={remoteVideoRef} 
+                        ref={setRemoteVideoRef} 
                         autoPlay 
                         playsInline 
                         className="w-full h-full object-cover"
                     />
                 ) : (
                     <div className="w-full h-full flex items-center justify-center bg-gray-900">
-                        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-violet-500"></div>
+                        <div className="flex flex-col items-center gap-4">
+                            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-violet-500"></div>
+                            <p className="text-gray-400 text-sm">Connecting video...</p>
+                        </div>
                     </div>
                 )}
 
@@ -62,12 +87,12 @@ const VideoCallScreen = () => {
                 <div className="absolute top-6 right-6 w-32 md:w-48 aspect-[3/4] md:aspect-video bg-gray-800 rounded-xl overflow-hidden shadow-2xl border-2 border-gray-600/50 z-10">
                     {localStream && !isCameraOff ? (
                         <video 
-                            ref={localVideoRef} 
+                            ref={setLocalVideoRef} 
                             autoPlay 
                             playsInline 
                             muted 
                             className="w-full h-full object-cover mirror" 
-                            style={{ transform: "scaleX(-1)" }} // mirror local video
+                            style={{ transform: "scaleX(-1)" }}
                         />
                     ) : (
                         <div className="w-full h-full flex items-center justify-center bg-gray-800 text-gray-500">
@@ -82,7 +107,6 @@ const VideoCallScreen = () => {
                         <h2 className="text-xl font-bold text-white">{currentCall.user?.fullName}</h2>
                         <p className="text-gray-300 font-mono">{formatDuration(callDuration)}</p>
                     </div>
-                    {/* Network indicator could go here */}
                 </div>
             </div>
 
