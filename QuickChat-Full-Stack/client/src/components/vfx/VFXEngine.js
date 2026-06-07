@@ -163,9 +163,12 @@ export class VFXEngine {
         video.muted = true;
         video.playsInline = true;
         video.crossOrigin = 'anonymous';
-        video.play().catch(e => console.warn("Video autoplay blocked:", e));
+        video.style.display = 'none'; // Hide it from user
+        document.body.appendChild(video); // Attach to DOM to prevent aggressive browser suspension
+        this.shieldVideo = video;
+        this.shieldVideo.play().catch(e => console.warn("Video autoplay blocked:", e));
         
-        const shieldTexture = new THREE.VideoTexture(video);
+        const shieldTexture = new THREE.VideoTexture(this.shieldVideo);
         
         this.shieldMaterial = new THREE.MeshBasicMaterial({
             map: shieldTexture,
@@ -267,6 +270,11 @@ export class VFXEngine {
             this.shieldMesh.visible = true;
             this.shieldMesh.position.copy(this.targetPos);
             this.shieldMesh.position.z += 0.2;
+            
+            // Force playback if browser suspended it in the background
+            if (this.shieldVideo && this.shieldVideo.paused) {
+                this.shieldVideo.play().catch(()=>{});
+            }
         } else {
             this.shieldMesh.visible = false;
         }
@@ -445,6 +453,10 @@ export class VFXEngine {
     }
 
     destroy() {
+        if (this.shieldVideo) {
+            this.shieldVideo.pause();
+            if (this.shieldVideo.parentNode) this.shieldVideo.parentNode.removeChild(this.shieldVideo);
+        }
         if (this.animationId) cancelAnimationFrame(this.animationId);
         window.removeEventListener('resize', this.resize.bind(this));
         this.renderer.dispose();
