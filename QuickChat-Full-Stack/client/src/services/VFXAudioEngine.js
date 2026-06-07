@@ -183,37 +183,85 @@ class VFXAudioEngine {
     }
 
     playCracklingElectricity() {
-        // Raw high-frequency sawtooth heavily modulated by a rapid square wave LFO
-        // This simulates the snapping and popping of high voltage arcs.
-        const osc = this.ctx.createOscillator();
-        osc.type = 'sawtooth';
-        osc.frequency.value = 400;
+        // ASMR Electric Tingles (Soft static, fizz, and pop rocks)
+        
+        // 1. Soft ASMR Noise (Fizz)
+        const bufferSize = this.ctx.sampleRate * 2;
+        const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+        const data = buffer.getChannelData(0);
+        for (let i = 0; i < bufferSize; i++) {
+            data[i] = Math.random() * 2 - 1;
+        }
 
-        const lfo = this.ctx.createOscillator();
-        lfo.type = 'square';
-        lfo.frequency.value = 40; // 40 snaps per second
+        const noise = this.ctx.createBufferSource();
+        noise.buffer = buffer;
+        noise.loop = true;
 
-        const lfoGain = this.ctx.createGain();
-        lfoGain.gain.value = 1000;
+        // Bandpass filter to make it sound like crisp but soft static
+        const noiseFilter = this.ctx.createBiquadFilter();
+        noiseFilter.type = 'bandpass';
+        noiseFilter.frequency.value = 4000;
+        noiseFilter.Q.value = 1.0;
 
-        lfo.connect(lfoGain);
-        lfoGain.connect(osc.frequency);
+        const noiseGain = this.ctx.createGain();
+        noiseGain.gain.value = 0.05; // Very quiet for ASMR
 
-        const filter = this.ctx.createBiquadFilter();
-        filter.type = 'highpass';
-        filter.frequency.value = 2000; // Keep it sounding sharp
+        // Panner to sweep the noise slightly left and right (tingles)
+        const panner = this.ctx.createStereoPanner();
+        const pannerLfo = this.ctx.createOscillator();
+        pannerLfo.type = 'sine';
+        pannerLfo.frequency.value = 0.5; // Slow sweep
+        pannerLfo.connect(panner.pan);
 
-        const gainNode = this.ctx.createGain();
-        gainNode.gain.value = 0.05; // Keep it quiet, high frequency is piercing
+        noise.connect(noiseFilter);
+        noiseFilter.connect(noiseGain);
+        noiseGain.connect(panner);
+        panner.connect(this.ctx.destination);
 
-        osc.connect(filter);
-        filter.connect(gainNode);
-        gainNode.connect(this.ctx.destination);
+        noise.start();
+        pannerLfo.start();
 
-        osc.start();
-        lfo.start();
+        this.activeNodes.push(noise, pannerLfo, noiseFilter, noiseGain, panner);
 
-        this.activeNodes.push(osc, lfo, filter, gainNode);
+        // 2. Random Pop Rocks (ASMR Crackles)
+        // We use an interval to spawn tiny clicks while the effect is active
+        const popInterval = setInterval(() => {
+            if (this.activeEffect !== "connect_webs" || this.ctx.state === 'suspended') {
+                clearInterval(popInterval);
+                return;
+            }
+
+            const popOsc = this.ctx.createOscillator();
+            popOsc.type = 'sine';
+            popOsc.frequency.setValueAtTime(8000 + Math.random() * 2000, this.ctx.currentTime); // High pitch click
+            popOsc.frequency.exponentialRampToValueAtTime(100, this.ctx.currentTime + 0.05);
+
+            const popGain = this.ctx.createGain();
+            popGain.gain.setValueAtTime(0.0, this.ctx.currentTime);
+            popGain.gain.linearRampToValueAtTime(0.05, this.ctx.currentTime + 0.01);
+            popGain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.05);
+
+            // Pan each pop randomly
+            const popPanner = this.ctx.createStereoPanner();
+            popPanner.pan.value = Math.random() * 2 - 1;
+
+            popOsc.connect(popGain);
+            popGain.connect(popPanner);
+            popPanner.connect(this.ctx.destination);
+
+            popOsc.start();
+            popOsc.stop(this.ctx.currentTime + 0.05);
+            
+            // Clean up pop nodes
+            setTimeout(() => {
+                popOsc.disconnect();
+                popGain.disconnect();
+                popPanner.disconnect();
+            }, 100);
+
+        }, 50); // A pop every 50ms
+
+        this.activeNodes.push({ stop: () => clearInterval(popInterval), disconnect: () => {} });
     }
 }
 

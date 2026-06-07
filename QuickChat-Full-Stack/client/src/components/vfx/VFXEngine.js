@@ -151,6 +151,8 @@ export class VFXEngine {
         
         this.webLines = new THREE.LineSegments(this.webGeometry, this.webMaterial);
         this.webLines.visible = false;
+        this.webLines.frustumCulled = false; // Prevent WebGL from hiding dynamic geometry
+        this.particleSystem.frustumCulled = false; // Prevent particle clipping
         this.scene.add(this.webLines);
 
         // State
@@ -381,8 +383,8 @@ export class VFXEngine {
                 }
                 this.webGeometry.attributes.position.needsUpdate = true;
 
-                // Spawn dense sparkles along the web lines
-                this.spawnParticles(30, 6);
+                // Spawn extremely dense ASMR sparkles along the web lines
+                this.spawnParticles(100, 6);
             } else {
                 this.spawnParticles(pCount, this.material.uniforms.uEffectType.value);
             }
