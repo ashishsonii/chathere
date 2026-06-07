@@ -159,4 +159,9 @@ export const setupCallSignaling = (io, socket, userSocketMap) => {
     socket.on("call:toggle-media", ({ callId, to, mediaType, isEnabled }) => {
         io.to(to.toString()).emit("call:media-toggled", { callId, from: userId, mediaType, isEnabled });
     });
+
+    // 9. Screen Share state notification — lets remote peer switch to cinema mode
+    socket.on("call:screen-share", ({ to, isSharing }) => {
+        io.to(to.toString()).emit("call:screen-share", { from: userId, isSharing });
+    });
 };

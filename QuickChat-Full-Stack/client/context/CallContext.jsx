@@ -13,6 +13,7 @@ export const CallProvider = ({ children }) => {
     const [callState, setCallState] = useState("idle"); // idle | ringing | calling | connected
     const [currentCall, setCurrentCall] = useState(null); // { callId, callerId, receiverId, type, ...user }
     const [callDuration, setCallDuration] = useState(0);
+    const [remoteIsScreenSharing, setRemoteIsScreenSharing] = useState(false);
 
     const { playRingtone, stopRingtone, playRingback, stopRingback } = useCallSounds();
     const {
@@ -21,6 +22,8 @@ export const CallProvider = ({ children }) => {
         isMuted,
         isCameraOff,
         isScreenSharing,
+        audioOutputDevices,
+        selectedAudioOutput,
         startLocalStream,
         initPeerConnection,
         createOffer,
@@ -29,7 +32,8 @@ export const CallProvider = ({ children }) => {
         handleIceCandidate,
         toggleMute,
         toggleCamera,
-        toggleScreenShare,
+        toggleScreenShare: webrtcToggleScreenShare,
+        changeAudioOutput,
         cleanup: cleanupWebRTC
     } = useWebRTC(socket, authUser?._id, axios);
 
@@ -132,7 +136,21 @@ export const CallProvider = ({ children }) => {
         setCallState("idle");
         setCurrentCall(null);
         setCallDuration(0);
+        setRemoteIsScreenSharing(false);
     }, [cleanupWebRTC, stopRingtone, stopRingback]);
+
+    // Wrapper around webrtcToggleScreenShare that also signals the remote peer
+    const toggleScreenShare = async () => {
+        const result = await webrtcToggleScreenShare();
+        // Determine the remote user ID
+        const remoteUserId = currentCallRef.current?.callerId === authUser?._id
+            ? currentCallRef.current?.receiverId
+            : currentCallRef.current?.callerId;
+        if (socket && remoteUserId) {
+            socket.emit("call:screen-share", { to: remoteUserId, isSharing: result });
+        }
+        return result;
+    };
 
     const startDurationTimer = () => {
         setCallDuration(0);
@@ -240,6 +258,12 @@ export const CallProvider = ({ children }) => {
         socket.on("call:ice-candidate", onIceCandidate);
         socket.on("call:error", onError);
 
+        // 10. Remote screen share notification
+        const onRemoteScreenShare = ({ isSharing }) => {
+            setRemoteIsScreenSharing(isSharing);
+        };
+        socket.on("call:screen-share", onRemoteScreenShare);
+
         return () => {
             socket.off("call:incoming", onIncoming);
             socket.off("call:initiated", onInitiated);
@@ -250,6 +274,7 @@ export const CallProvider = ({ children }) => {
             socket.off("call:sdp-answer", onSdpAnswer);
             socket.off("call:ice-candidate", onIceCandidate);
             socket.off("call:error", onError);
+            socket.off("call:screen-share", onRemoteScreenShare);
         };
     }, [socket, authUser, initPeerConnection, createOffer, createAnswer, handleAnswer, handleIceCandidate, stopRingback, playRingtone, cleanupCall, axios]);
 
@@ -263,13 +288,17 @@ export const CallProvider = ({ children }) => {
         isMuted,
         isCameraOff,
         isScreenSharing,
+        remoteIsScreenSharing,
+        audioOutputDevices,
+        selectedAudioOutput,
         initiateCall,
         acceptCall,
         rejectCall,
         endCall,
         toggleMute,
         toggleCamera,
-        toggleScreenShare
+        toggleScreenShare,
+        changeAudioOutput
     };
 
     return (

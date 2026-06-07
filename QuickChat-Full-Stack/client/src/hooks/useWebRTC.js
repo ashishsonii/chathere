@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import toast from 'react-hot-toast';
 
 const ICE_SERVERS = {
@@ -17,6 +17,8 @@ export const useWebRTC = (socket, userId, axios) => {
     const [isMuted, setIsMuted] = useState(false);
     const [isCameraOff, setIsCameraOff] = useState(false);
     const [isScreenSharing, setIsScreenSharing] = useState(false);
+    const [audioOutputDevices, setAudioOutputDevices] = useState([]);
+    const [selectedAudioOutput, setSelectedAudioOutput] = useState('default');
     
     const peerConnection = useRef(null);
     const pendingCandidates = useRef([]);
@@ -312,8 +314,14 @@ export const useWebRTC = (socket, userId, axios) => {
         try {
             if (!isScreenSharingRef.current) {
                 // --- START screen share ---
+                // Request HD quality: 1080p preferred, up to 4K, high framerate
                 const screenStream = await navigator.mediaDevices.getDisplayMedia({
-                    video: { cursor: "always" },
+                    video: {
+                        cursor: "always",
+                        width: { ideal: 1920, max: 3840 },
+                        height: { ideal: 1080, max: 2160 },
+                        frameRate: { ideal: 30, max: 60 }
+                    },
                     audio: false
                 });
 
@@ -335,8 +343,22 @@ export const useWebRTC = (socket, userId, axios) => {
                 // Save the camera stream so we can switch back
                 cameraStreamRef.current = localStreamRef.current;
 
+                // Hint browser this is detailed content (sharper text rendering)
+                try { screenTrack.contentHint = 'detail'; } catch(e) {}
+
                 // Replace the camera track with the screen track
                 await videoSender.replaceTrack(screenTrack);
+
+                // Boost encoding bitrate for HD quality screen share
+                try {
+                    const params = videoSender.getParameters();
+                    if (!params.encodings) params.encodings = [{}];
+                    params.encodings.forEach(enc => {
+                        enc.maxBitrate = 4_000_000; // 4 Mbps for crisp HD
+                        enc.maxFramerate = 30;
+                    });
+                    await videoSender.setParameters(params);
+                } catch(e) { console.warn('[WebRTC] Could not set screen share bitrate:', e.message); }
 
                 // Update local stream to show screen in PiP
                 const newStream = new MediaStream([
@@ -384,6 +406,18 @@ export const useWebRTC = (socket, userId, axios) => {
         const cameraTrack = cameraStream.getVideoTracks()[0];
         if (cameraTrack && videoSender) {
             await videoSender.replaceTrack(cameraTrack);
+
+            // Restore normal camera bitrate
+            try {
+                const params = videoSender.getParameters();
+                if (params.encodings) {
+                    params.encodings.forEach(enc => {
+                        enc.maxBitrate = 1_500_000; // 1.5 Mbps for camera
+                        enc.maxFramerate = 30;
+                    });
+                    await videoSender.setParameters(params);
+                }
+            } catch(e) {}
         }
 
         // Stop the screen track
@@ -400,6 +434,35 @@ export const useWebRTC = (socket, userId, axios) => {
         isScreenSharingRef.current = false;
         setIsScreenSharing(false);
         cameraStreamRef.current = null;
+    }, []);
+
+    // --- Audio Output Device Management ---
+    // Refresh the list of available audio output devices
+    const refreshAudioDevices = useCallback(async () => {
+        try {
+            const devices = await navigator.mediaDevices.enumerateDevices();
+            const outputs = devices.filter(d => d.kind === 'audiooutput');
+            setAudioOutputDevices(outputs);
+        } catch(e) {
+            console.warn('[WebRTC] Cannot enumerate audio devices:', e.message);
+        }
+    }, []);
+
+    // Listen for device changes (plugging in headphones, connecting Bluetooth)
+    useEffect(() => {
+        if (!navigator.mediaDevices?.addEventListener) return;
+        const handler = () => refreshAudioDevices();
+        navigator.mediaDevices.addEventListener('devicechange', handler);
+        // Initial load
+        refreshAudioDevices();
+        return () => navigator.mediaDevices.removeEventListener('devicechange', handler);
+    }, [refreshAudioDevices]);
+
+    // Change audio output device (speaker, Bluetooth, earpiece, etc.)
+    const changeAudioOutput = useCallback(async (deviceId) => {
+        setSelectedAudioOutput(deviceId);
+        // The actual setSinkId call is handled by the VideoCallScreen component
+        // on its <video> elements, since setSinkId is a DOM API on HTMLMediaElement
     }, []);
 
     const cleanup = useCallback(() => {
@@ -430,6 +493,8 @@ export const useWebRTC = (socket, userId, axios) => {
         isMuted,
         isCameraOff,
         isScreenSharing,
+        audioOutputDevices,
+        selectedAudioOutput,
         startLocalStream,
         initPeerConnection,
         createOffer,
@@ -439,6 +504,7 @@ export const useWebRTC = (socket, userId, axios) => {
         toggleMute,
         toggleCamera,
         toggleScreenShare,
+        changeAudioOutput,
         cleanup
     };
 };
