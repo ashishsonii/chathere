@@ -1,0 +1,18 @@
+{
+  "name": "Orry - Chatby Ashish",
+  "short_name": "Orry Chat",
+  "description": "Fast and reliable video and text chat.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#000000",
+  "theme_color": "#8b5cf6",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
