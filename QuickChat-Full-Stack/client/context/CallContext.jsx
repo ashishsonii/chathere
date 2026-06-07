@@ -20,6 +20,7 @@ export const CallProvider = ({ children }) => {
         remoteStream,
         isMuted,
         isCameraOff,
+        isScreenSharing,
         startLocalStream,
         initPeerConnection,
         createOffer,
@@ -28,6 +29,7 @@ export const CallProvider = ({ children }) => {
         handleIceCandidate,
         toggleMute,
         toggleCamera,
+        toggleScreenShare,
         cleanup: cleanupWebRTC
     } = useWebRTC(socket, authUser?._id, axios);
 
@@ -260,12 +262,14 @@ export const CallProvider = ({ children }) => {
         remoteStream,
         isMuted,
         isCameraOff,
+        isScreenSharing,
         initiateCall,
         acceptCall,
         rejectCall,
         endCall,
         toggleMute,
-        toggleCamera
+        toggleCamera,
+        toggleScreenShare
     };
 
     return (
