@@ -86,6 +86,16 @@ export class GestureEngine {
                             return; // Skip single hand processing
                         }
 
+                        // --- DEBOUNCE TWO HANDS ---
+                        // If we recently saw two hands, and one hand temporarily drops out of frame/tracking for a microsecond,
+                        // do NOT instantly snap back to the Single Hand (Shield) logic, otherwise it causes a rapid flashing bug.
+                        if (this.currentGesture === "connect_webs" && this.debounceFrames > 0 && this.lastEventPayload) {
+                            this.debounceFrames--;
+                            onGesture(this.lastEventPayload);
+                            this.animationFrameId = requestAnimationFrame(renderLoop);
+                            return;
+                        }
+
                         // --- SINGLE HAND LOGIC ---
                         const gestureName = results.gestures[0][0].categoryName;
                         const score = results.gestures[0][0].score;
