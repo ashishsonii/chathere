@@ -77,7 +77,7 @@ void main() {
     } else if (uEffectType == 6) { // Web Sparkles
         finalColor = mix(vec3(0.0, 1.0, 1.0), vec3(0.5, 0.0, 1.0), vLife); // Cyan to purple
         float star = 0.05 / (ll + 0.01);
-        alpha = star * (1.0 - vLife) * 1.5;
+        alpha = star; // Instant full brightness for thick lightning!
     } else if (uEffectType == 0) { // Dr Strange Shield (Reverted to Blue/Cyan)
         finalColor = mix(vec3(0.2, 0.8, 1.0), vec3(0.0, 0.3, 1.0), vLife);
         // Star sparkle texture
@@ -389,8 +389,8 @@ export class VFXEngine {
                 }
                 this.webGeometry.attributes.position.needsUpdate = true;
 
-                // Spawn extremely dense ASMR sparkles along the web lines
-                this.spawnParticles(100, 6);
+                // Spawn thick ASMR sparkles along the web lines
+                this.spawnParticles(40, 6);
             } else {
                 this.spawnParticles(pCount, this.material.uniforms.uEffectType.value);
             }
