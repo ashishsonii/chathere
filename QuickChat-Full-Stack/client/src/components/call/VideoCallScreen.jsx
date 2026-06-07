@@ -1,7 +1,7 @@
 import React, { useContext, useEffect, useRef, useCallback, useState } from 'react';
 import { CallContext } from '../../../context/CallContext';
-import { gestureEngine } from '../../../services/GestureEngine';
-import { vfxAudioEngine } from '../../../services/VFXAudioEngine';
+import { gestureEngine } from '../../services/GestureEngine';
+import { vfxAudioEngine } from '../../services/VFXAudioEngine';
 import { VFXCanvas } from '../vfx/VFXCanvas';
 
 const formatDuration = (seconds) => {
