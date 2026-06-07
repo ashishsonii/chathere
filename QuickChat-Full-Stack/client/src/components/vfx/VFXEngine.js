@@ -72,8 +72,8 @@ void main() {
     } else if (uEffectType == 2) { // Lightning
         finalColor = vec3(0.5, 0.8, 1.0);
         if (ll < 0.1) finalColor = vec3(1.0); // Hot core
-    } else if (uEffectType == 0) { // Dr Strange Shield
-        finalColor = mix(vec3(1.0, 0.8, 0.1), vec3(1.0, 0.3, 0.0), vLife);
+    } else if (uEffectType == 0) { // Dr Strange Shield (Reverted to Blue/Cyan)
+        finalColor = mix(vec3(0.2, 0.8, 1.0), vec3(0.0, 0.3, 1.0), vLife);
         // Star sparkle texture
         float star = 0.05 / (ll + 0.01);
         alpha = star * (1.0 - vLife);
@@ -129,9 +129,29 @@ export class VFXEngine {
         this.particleSystem = new THREE.Points(geometry, this.material);
         this.scene.add(this.particleSystem);
 
+        // Setup Connected Webs (LineSegments)
+        this.webGeometry = new THREE.BufferGeometry();
+        // 5 lines, 2 vertices each, 3 floats per vertex = 30 floats
+        this.webPositions = new Float32Array(30); 
+        this.webGeometry.setAttribute('position', new THREE.BufferAttribute(this.webPositions, 3));
+        
+        this.webMaterial = new THREE.LineBasicMaterial({
+            color: 0x00ffff,
+            transparent: true,
+            opacity: 0.8,
+            blending: THREE.AdditiveBlending,
+            depthWrite: false
+        });
+        
+        this.webLines = new THREE.LineSegments(this.webGeometry, this.webMaterial);
+        this.webLines.visible = false;
+        this.scene.add(this.webLines);
+
         // State
         this.activeEffect = null;
         this.targetPos = new THREE.Vector3(0,0,0);
+        this.hand1Points = null;
+        this.hand2Points = null;
         this.clock = new THREE.Clock();
         this.animationId = null;
 
@@ -152,13 +172,7 @@ export class VFXEngine {
         }
     }
 
-    triggerEffect(gesture, x, y) {
-        if (gesture === "none") {
-            this.activeEffect = null;
-            return;
-        }
-
-        // Map 0.0-1.0 screen coordinates to 3D world space coordinates
+    mapScreenToWorld(x, y) {
         const vec = new THREE.Vector3(
             (x * 2) - 1,
             -(y * 2) + 1,
@@ -167,7 +181,43 @@ export class VFXEngine {
         vec.unproject(this.camera);
         const dir = vec.sub(this.camera.position).normalize();
         const distance = -this.camera.position.z / dir.z;
-        this.targetPos.copy(this.camera.position).add(dir.multiplyScalar(distance));
+        return this.camera.position.clone().add(dir.multiplyScalar(distance));
+    }
+
+    triggerEffect(gesture, x, y, hand1 = null, hand2 = null) {
+        if (gesture === "none") {
+            this.activeEffect = null;
+            this.webLines.visible = false;
+            return;
+        }
+
+        if (gesture === "connect_webs" && hand1 && hand2) {
+            this.activeEffect = gesture;
+            this.webLines.visible = true;
+            this.hand1Points = hand1;
+            this.hand2Points = hand2;
+            
+            // Map the 5 fingers
+            for (let i = 0; i < 5; i++) {
+                const pos1 = this.mapScreenToWorld(hand1[i].x, hand1[i].y);
+                const pos2 = this.mapScreenToWorld(hand2[i].x, hand2[i].y);
+                
+                this.webPositions[i * 6] = pos1.x;
+                this.webPositions[i * 6 + 1] = pos1.y;
+                this.webPositions[i * 6 + 2] = pos1.z;
+                
+                this.webPositions[i * 6 + 3] = pos2.x;
+                this.webPositions[i * 6 + 4] = pos2.y;
+                this.webPositions[i * 6 + 5] = pos2.z;
+            }
+            this.webGeometry.attributes.position.needsUpdate = true;
+            return;
+        } else {
+            this.webLines.visible = false;
+        }
+
+        // Standard point mapping
+        this.targetPos.copy(this.mapScreenToWorld(x, y));
 
         let typeInt = 0;
         switch(gesture) {
@@ -191,6 +241,34 @@ export class VFXEngine {
                 this.lifes[i] = 0.0; // Reset life
                 
                 // Base position with slight jitter
+                if (typeInt === 6) { // Web Sparkles along the lines
+                    // Pick a random finger pair line (0 to 4)
+                    const fIdx = Math.floor(Math.random() * 5);
+                    const t = Math.random(); // Position along the line
+                    
+                    const p1x = this.webPositions[fIdx * 6];
+                    const p1y = this.webPositions[fIdx * 6 + 1];
+                    const p1z = this.webPositions[fIdx * 6 + 2];
+                    
+                    const p2x = this.webPositions[fIdx * 6 + 3];
+                    const p2y = this.webPositions[fIdx * 6 + 4];
+                    const p2z = this.webPositions[fIdx * 6 + 5];
+
+                    this.positions[i*3] = p1x + (p2x - p1x) * t + (Math.random() - 0.5) * 0.1;
+                    this.positions[i*3+1] = p1y + (p2y - p1y) * t + (Math.random() - 0.5) * 0.1;
+                    this.positions[i*3+2] = p1z + (p2z - p1z) * t + (Math.random() - 0.5) * 0.1;
+                    
+                    this.colors[i*3] = 0.5; this.colors[i*3+1] = 0.8; this.colors[i*3+2] = 1.0;
+                    this.velocities[i*3] = (Math.random() - 0.5) * 1.0;
+                    this.velocities[i*3+1] = Math.random() * 2.0 - 1.0; // Float
+                    this.velocities[i*3+2] = (Math.random() - 0.5) * 1.0;
+                    this.sizes[i] = Math.random() * 10 + 5;
+                    
+                    spawned++;
+                    if (spawned >= count) break;
+                    continue;
+                }
+
                 this.positions[i*3] = this.targetPos.x + (Math.random() - 0.5) * 0.2;
                 this.positions[i*3+1] = this.targetPos.y + (Math.random() - 0.5) * 0.2;
                 this.positions[i*3+2] = this.targetPos.z + (Math.random() - 0.5) * 0.1;
@@ -275,7 +353,19 @@ export class VFXEngine {
             if (this.activeEffect === "fire_throw") pCount = 20;
             if (this.activeEffect === "open_palm") pCount = 25; // Dense sparkling shield
             
-            this.spawnParticles(pCount, this.material.uniforms.uEffectType.value);
+            if (this.activeEffect === "connect_webs") {
+                // Animate jitter on the web lines
+                const positions = this.webGeometry.attributes.position.array;
+                for(let i=0; i<30; i++) {
+                    positions[i] += (Math.random() - 0.5) * 0.05;
+                }
+                this.webGeometry.attributes.position.needsUpdate = true;
+                
+                // Spawn sparkles
+                this.spawnParticles(15, 6);
+            } else {
+                this.spawnParticles(pCount, this.material.uniforms.uEffectType.value);
+            }
         }
 
         this.renderer.render(this.scene, this.camera);

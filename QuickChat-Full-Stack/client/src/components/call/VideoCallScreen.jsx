@@ -118,7 +118,7 @@ const VideoCallScreen = () => {
             gestureEngine.initialize().then(() => {
                 gestureEngine.start(localVideoRef.current, (event) => {
                     if (localVFXRef.current) {
-                        localVFXRef.current.triggerEffect(event.gesture, event.x, event.y);
+                        localVFXRef.current.triggerEffect(event.gesture, event.x, event.y, event.hand1, event.hand2);
                         vfxAudioEngine.playEffect(event.gesture);
                     }
                     if (sendGestureEvent) sendGestureEvent(event);
@@ -143,7 +143,9 @@ const VideoCallScreen = () => {
             remoteVFXRef.current.triggerEffect(
                 lastGestureEvent.gesture,
                 lastGestureEvent.x,
-                lastGestureEvent.y
+                lastGestureEvent.y,
+                lastGestureEvent.hand1,
+                lastGestureEvent.hand2
             );
             vfxAudioEngine.playEffect(lastGestureEvent.gesture);
         }

@@ -53,6 +53,32 @@ export class GestureEngine {
                     const results = this.recognizer.recognizeForVideo(videoElement, performance.now());
                     
                     if (results.gestures.length > 0) {
+                        
+                        // --- TWO HANDS LOGIC (Connected Webs) ---
+                        if (results.landmarks.length === 2 && results.gestures.length === 2) {
+                            const gesture1 = results.gestures[0][0].categoryName;
+                            const gesture2 = results.gestures[1][0].categoryName;
+                            
+                            if (gesture1 === "Open_Palm" && gesture2 === "Open_Palm") {
+                                // Extract the 5 fingertips for both hands: [Thumb (4), Index (8), Middle (12), Ring (16), Pinky (20)]
+                                const h1 = results.landmarks[0];
+                                const h2 = results.landmarks[1];
+                                
+                                const hand1 = [h1[4], h1[8], h1[12], h1[16], h1[20]];
+                                const hand2 = [h2[4], h2[8], h2[12], h2[16], h2[20]];
+                                
+                                this.currentGesture = "connect_webs";
+                                onGesture({
+                                    gesture: "connect_webs",
+                                    x: 0, y: 0, z: 0, // Dummy
+                                    hand1: hand1,
+                                    hand2: hand2
+                                });
+                                return; // Skip single hand processing
+                            }
+                        }
+
+                        // --- SINGLE HAND LOGIC ---
                         const gestureName = results.gestures[0][0].categoryName;
                         const score = results.gestures[0][0].score;
                         
