@@ -24,7 +24,7 @@ const VoiceCallScreen = () => {
     useEffect(() => {
         if (audioRef.current && remoteStream) {
             audioRef.current.srcObject = remoteStream;
-            audioRef.current.play().catch(e => console.error("Audio play failed:", e));
+            audioRef.current.play().catch(e => console.log("Audio play failed:", e));
         }
     }, [remoteStream]);
 

@@ -56,7 +56,9 @@ export const useWebRTC = (socket, userId, axios) => {
 
         // 2. Handle remote stream (when track is received)
         pc.ontrack = (event) => {
-            setRemoteStream(event.streams[0]);
+            // Always create a new MediaStream to ensure React detects the state change
+            // when new tracks are added to the existing stream sequentially.
+            setRemoteStream(new MediaStream(event.streams[0].getTracks()));
         };
 
         // 3. Add local tracks to peer connection if we already have a stream
