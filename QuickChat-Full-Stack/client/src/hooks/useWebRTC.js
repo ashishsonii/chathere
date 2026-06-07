@@ -54,24 +54,9 @@ export const useWebRTC = (socket, userId, axios) => {
         pendingCandidates.current = [];
 
         // Fetch TURN credentials for NAT traversal reliability
+        // Use public Google STUN servers. No API key required.
+        // NOTE: Without a TURN server, iOS Safari (Private Relay) and Cellular networks may still block connections.
         let iceServersConfig = ICE_SERVERS;
-        try {
-            if (axios) {
-                const { data } = await axios.get("/api/calls/turn-credentials");
-                if (data.success && data.credentials) {
-                    const credentialsArray = Array.isArray(data.credentials) ? data.credentials : [data.credentials];
-                    iceServersConfig = {
-                        iceServers: [
-                            ...ICE_SERVERS.iceServers,
-                            ...credentialsArray
-                        ],
-                        iceCandidatePoolSize: 10
-                    };
-                }
-            }
-        } catch (error) {
-            console.warn("[WebRTC] TURN credentials unavailable, using STUN only:", error.message);
-        }
 
         const pc = new RTCPeerConnection(iceServersConfig);
         peerConnection.current = pc;
