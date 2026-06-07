@@ -1,8 +1,5 @@
 import React, { useContext, useEffect, useRef, useCallback, useState } from 'react';
 import { CallContext } from '../../../context/CallContext';
-import { gestureEngine } from '../../services/GestureEngine';
-import { vfxAudioEngine } from '../../services/VFXAudioEngine';
-import { VFXCanvas } from '../vfx/VFXCanvas';
 
 const formatDuration = (seconds) => {
     const m = Math.floor(seconds / 60).toString().padStart(2, '0');
@@ -33,18 +30,12 @@ const VideoCallScreen = () => {
         audioOutputDevices,
         selectedAudioOutput,
         localStream,
-        remoteStream,
-        lastGestureEvent,
-        sendGestureEvent,
-        vfxModeEnabled,
-        toggleVfxMode
+        remoteStream
     } = useContext(CallContext);
 
     const localVideoRef = useRef(null);
     const remoteVideoRef = useRef(null);
     const containerRef = useRef(null);
-    const localVFXRef = useRef(null);
-    const remoteVFXRef = useRef(null);
 
     // --- Auto-hide controls ---
     const [controlsVisible, setControlsVisible] = useState(true);
@@ -110,46 +101,6 @@ const VideoCallScreen = () => {
         }
     }, [localStream]);
 
-    // --- Gesture & VFX Integration ---
-    useEffect(() => {
-        if (!localVideoRef.current) return;
-        
-        if (vfxModeEnabled && callState === 'connected') {
-            gestureEngine.initialize().then(() => {
-                gestureEngine.start(localVideoRef.current, (event) => {
-                    if (localVFXRef.current) {
-                        localVFXRef.current.triggerEffect(event.gesture, event.x, event.y, event.hand1, event.hand2);
-                        vfxAudioEngine.playEffect(event.gesture);
-                    }
-                    if (sendGestureEvent) sendGestureEvent(event);
-                });
-            });
-        } else {
-            gestureEngine.stop();
-            vfxAudioEngine.stopEffect();
-            if (localVFXRef.current) localVFXRef.current.triggerEffect("none", 0, 0);
-            if (sendGestureEvent) sendGestureEvent({ gesture: "none", x: 0, y: 0, z: 0 });
-        }
-        
-        return () => {
-            gestureEngine.stop();
-            vfxAudioEngine.stopEffect();
-        };
-    }, [vfxModeEnabled, callState, sendGestureEvent]);
-
-    // Listen to remote gesture events
-    useEffect(() => {
-        if (lastGestureEvent && remoteVFXRef.current) {
-            remoteVFXRef.current.triggerEffect(
-                lastGestureEvent.gesture,
-                lastGestureEvent.x,
-                lastGestureEvent.y,
-                lastGestureEvent.hand1,
-                lastGestureEvent.hand2
-            );
-            vfxAudioEngine.playEffect(lastGestureEvent.gesture);
-        }
-    }, [lastGestureEvent]);
 
     // Bind remote stream to remote video element
     useEffect(() => {
@@ -187,9 +138,6 @@ const VideoCallScreen = () => {
         if (el && localStream) {
             el.srcObject = localStream;
             el.play().catch(() => {});
-        } else if (!el) {
-            // Cleanup when video unmounts
-            gestureEngine.stop();
         }
     }, [localStream]);
 
@@ -251,7 +199,6 @@ const VideoCallScreen = () => {
                                 transition: 'transform 0.2s ease'
                             }}
                         />
-                        <VFXCanvas ref={remoteVFXRef} className="absolute inset-0 z-10 pointer-events-none" />
                     </>
                 ) : (
                     <div className="w-full h-full flex items-center justify-center bg-gray-900">
@@ -290,7 +237,6 @@ const VideoCallScreen = () => {
                                 className="w-full h-full object-cover" 
                                 style={isScreenSharing ? {} : { transform: "scaleX(-1)" }}
                             />
-                            <VFXCanvas ref={localVFXRef} className="absolute inset-0 z-10 pointer-events-none" />
                         </>
                     ) : (
                         <div className="w-full h-full flex items-center justify-center bg-gray-800 text-gray-500 text-xs">
@@ -475,16 +421,6 @@ const VideoCallScreen = () => {
                     )}
                 </div>
 
-                {/* VFX Mode Toggle */}
-                <button 
-                    onClick={toggleVfxMode}
-                    className={`w-10 h-10 md:w-12 md:h-12 rounded-full flex items-center justify-center transition-all ${vfxModeEnabled ? 'bg-amber-400 text-black shadow-[0_0_15px_rgba(251,191,36,0.5)] scale-110' : 'bg-gray-700 text-white hover:bg-gray-600'}`}
-                    title={vfxModeEnabled ? 'Disable VFX Mode' : 'Enable VFX Mode'}
-                >
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09l2.846.813-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM16.894 20.567L16.5 21.75l-.394-1.183a2.25 2.25 0 00-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 001.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 001.423 1.423l1.183.394-1.183.394a2.25 2.25 0 00-1.423 1.423z" />
-                    </svg>
-                </button>
 
                 {/* End Call Button */}
                 <button 

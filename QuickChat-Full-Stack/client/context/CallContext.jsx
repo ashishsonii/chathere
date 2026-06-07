@@ -14,8 +14,6 @@ export const CallProvider = ({ children }) => {
     const [currentCall, setCurrentCall] = useState(null); // { callId, callerId, receiverId, type, ...user }
     const [callDuration, setCallDuration] = useState(0);
     const [remoteIsScreenSharing, setRemoteIsScreenSharing] = useState(false);
-    const [lastGestureEvent, setLastGestureEvent] = useState(null);
-    const [vfxModeEnabled, setVfxModeEnabled] = useState(false); // Toggle for VFX system
 
     const { playRingtone, stopRingtone, playRingback, stopRingback } = useCallSounds();
     const {
@@ -36,9 +34,8 @@ export const CallProvider = ({ children }) => {
         toggleCamera,
         toggleScreenShare: webrtcToggleScreenShare,
         changeAudioOutput,
-        sendGestureEvent,
         cleanup: cleanupWebRTC
-    } = useWebRTC(socket, authUser?._id, axios, setLastGestureEvent);
+    } = useWebRTC(socket, authUser?._id, axios);
 
     const timerRef = useRef(null);
     const timeoutRef = useRef(null); // 30s ring timeout
@@ -140,8 +137,6 @@ export const CallProvider = ({ children }) => {
         setCurrentCall(null);
         setCallDuration(0);
         setRemoteIsScreenSharing(false);
-        setLastGestureEvent(null);
-        setVfxModeEnabled(false);
     }, [cleanupWebRTC, stopRingtone, stopRingback]);
 
     // Wrapper around webrtcToggleScreenShare that also signals the remote peer
@@ -303,11 +298,7 @@ export const CallProvider = ({ children }) => {
         toggleMute,
         toggleCamera,
         toggleScreenShare,
-        changeAudioOutput,
-        lastGestureEvent,
-        sendGestureEvent,
-        vfxModeEnabled,
-        toggleVfxMode: () => setVfxModeEnabled(prev => !prev)
+        changeAudioOutput
     };
 
     return (
