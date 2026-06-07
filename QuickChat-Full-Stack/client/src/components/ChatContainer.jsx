@@ -121,7 +121,6 @@ const ChatContainer = () => {
                     <div className='flex flex-col'>
                         {selectedUser.fullName}
                         {onlineUsers.includes(selectedUser._id) && <span className="w-2 h-2 rounded-full bg-green-500"></span>}
-                        {typingStatus[selectedUser?._id] && <span className='text-xs text-gray-400'>typing...</span>}
                     </div>
                 </div>
                 <img onClick={()=> setSelectedUser(null)} src={assets.arrow_icon} alt="" className='md:hidden max-w-7 cursor-pointer'/>
@@ -181,6 +180,19 @@ const ChatContainer = () => {
                             </div>
                         </div>
                     ))}
+                    {typingStatus[selectedUser?._id] && (
+                        <div className="flex items-end gap-2 justify-end flex-row-reverse">
+                            <div className="p-3 px-4 w-[70px] md:text-sm font-light rounded-lg mb-8 bg-violet-500/30 text-white rounded-bl-none flex items-center justify-between">
+                                <span className="w-1.5 h-1.5 bg-gray-300 rounded-full animate-bounce" style={{ animationDelay: '0s' }}></span>
+                                <span className="w-1.5 h-1.5 bg-gray-300 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></span>
+                                <span className="w-1.5 h-1.5 bg-gray-300 rounded-full animate-bounce" style={{ animationDelay: '0.4s' }}></span>
+                            </div>
+                            <div className="text-center text-xs shrink-0">
+                                <img src={selectedUser?.profilePic || assets.avatar_icon} alt="" className="w-7 rounded-full" />
+                                <p className="text-gray-500 text-[10px] mt-1">Typing</p>
+                            </div>
+                        </div>
+                    )}
                     <div ref={scrollEnd}></div>
                 </div>
             </div>
