@@ -12,8 +12,25 @@ export const AuthContext = createContext();
 export const AuthProvider = ({ children })=>{
 
     const [token, setToken] = useState(localStorage.getItem("token"));
-    const [authUser, setAuthUser] = useState(null);
+    const [authUser, setAuthUser] = useState(() => {
+        try {
+            const saved = localStorage.getItem("authUser");
+            return saved ? JSON.parse(saved) : null;
+        } catch (e) {
+            return null;
+        }
+    });
     const [onlineUsers, setOnlineUsers] = useState([]);
+
+    // Helper to sync authUser to localStorage
+    const updateAuthUser = (user) => {
+        setAuthUser(user);
+        if (user) {
+            localStorage.setItem("authUser", JSON.stringify(user));
+        } else {
+            localStorage.removeItem("authUser");
+        }
+    };
     const [socket, setSocket] = useState(null);
     const [isCheckingAuth, setIsCheckingAuth] = useState(!!localStorage.getItem("token"));
 
@@ -27,14 +44,19 @@ export const AuthProvider = ({ children })=>{
             }
             const { data } = await axios.get("/api/auth/check");
             if (data.success) {
-                setAuthUser(data.user)
+                updateAuthUser(data.user)
                 connectSocket(data.user)
             } else {
-                setAuthUser(null);
+                updateAuthUser(null);
             }
         } catch (error) {
             console.log("Auth check failed:", error.message);
-            setAuthUser(null);
+            // Only clear auth on strict 401/404 errors, ignore 5xx network hiccups
+            if (error.response && (error.response.status === 401 || error.response.status === 404)) {
+                updateAuthUser(null);
+                localStorage.removeItem("token");
+                setToken(null);
+            }
         } finally {
             setIsCheckingAuth(false);
         }
@@ -50,7 +72,7 @@ const login = async (state, credentials)=>{
             axios.defaults.headers.common["token"] = data.token;
             setToken(data.token);
             localStorage.setItem("token", data.token)
-            setAuthUser(data.userData);
+            updateAuthUser(data.userData);
             connectSocket(data.userData);
             toast.success(data.message)
         }else{
@@ -65,6 +87,7 @@ const login = async (state, credentials)=>{
 
     const logout = async () =>{
         localStorage.removeItem("token");
+        localStorage.removeItem("authUser");
         setToken(null);
         setAuthUser(null);
         setOnlineUsers([]);
@@ -79,7 +102,7 @@ const login = async (state, credentials)=>{
         try {
             const { data } = await axios.put("/api/auth/update-profile", body);
             if(data.success){
-                setAuthUser(data.user);
+                updateAuthUser(data.user);
                 toast.success("Profile updated successfully")
             }
         } catch (error) {

@@ -11,13 +11,6 @@ const ICE_SERVERS = {
     iceCandidatePoolSize: 10
 };
 
-// Munge SDP to force Application Specific bandwidth (8 Mbps) for high quality chunks
-const mungeSDP = (sdp) => {
-    if (!sdp) return sdp;
-    // Inject bandwidth limit into each media section
-    return sdp.replace(/a=mid:(.*)\r\n/g, 'a=mid:$1\r\nb=AS:8000\r\n');
-};
-
 export const useWebRTC = (socket, userId, axios) => {
     const [localStream, setLocalStream] = useState(null);
     const [remoteStream, setRemoteStream] = useState(null);
@@ -170,7 +163,6 @@ export const useWebRTC = (socket, userId, axios) => {
                 offerToReceiveAudio: true,
                 offerToReceiveVideo: true
             });
-            offer.sdp = mungeSDP(offer.sdp); // Enforce bitrate via SDP
             await pc.setLocalDescription(offer);
             
             socket.emit("call:sdp-offer", {
@@ -191,7 +183,6 @@ export const useWebRTC = (socket, userId, axios) => {
         try {
             await pc.setRemoteDescription(new RTCSessionDescription(offer));
             const answer = await pc.createAnswer();
-            answer.sdp = mungeSDP(answer.sdp); // Enforce bitrate via SDP
             await pc.setLocalDescription(answer);
 
             socket.emit("call:sdp-answer", {
