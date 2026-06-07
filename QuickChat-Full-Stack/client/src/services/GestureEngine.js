@@ -78,11 +78,11 @@ export class GestureEngine {
                         
                         // Map MediaPipe standard gestures to our VFX triggers
                         let mappedGesture = null;
-                        if (gestureName === "Open_Palm") mappedGesture = "hand_raise";
+                        if (gestureName === "Open_Palm") mappedGesture = "open_palm";
                         if (gestureName === "Closed_Fist") mappedGesture = "closed_fist";
                         if (gestureName === "Victory") mappedGesture = "two_finger";
                         if (gestureName === "Thumb_Up") mappedGesture = "thumbs_up";
-                        if (gestureName === "ILoveYou" || gestureName === "Pointing_Up") mappedGesture = "open_palm"; // Fallback for 5th gesture
+                        if (gestureName === "ILoveYou" || gestureName === "Pointing_Up") mappedGesture = "hand_raise";
 
                         // Override with the super power throw if pushing
                         if (isPushing && (gestureName === "Open_Palm" || gestureName === "Closed_Fist")) {

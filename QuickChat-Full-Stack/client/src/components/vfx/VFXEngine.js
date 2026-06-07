@@ -30,8 +30,13 @@ void main() {
         pos += velocity * (uTime * 5.0);
     } else if (uEffectType == 5) { // Fire Throw (Push)
         pos += velocity * (uTime * 15.0);
-    } else { // Shield (Open Palm)
-        pos += normalize(velocity) * sin(uTime * 2.0) * 0.1;
+    } else { // Dr Strange Shield (Open Palm)
+        // velocity.x = base angle, velocity.y = radius
+        float angle = velocity.x + uTime * 3.0; // Spin speed
+        float radius = velocity.y;
+        pos.x += cos(angle) * radius;
+        pos.y += sin(angle) * radius;
+        pos.z += velocity.z + sin(uTime * 5.0 + velocity.x) * 0.1;
     }
 
     vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
@@ -67,6 +72,11 @@ void main() {
     } else if (uEffectType == 2) { // Lightning
         finalColor = vec3(0.5, 0.8, 1.0);
         if (ll < 0.1) finalColor = vec3(1.0); // Hot core
+    } else if (uEffectType == 0) { // Dr Strange Shield
+        finalColor = mix(vec3(1.0, 0.8, 0.1), vec3(1.0, 0.3, 0.0), vLife);
+        // Star sparkle texture
+        float star = 0.05 / (ll + 0.01);
+        alpha = star * (1.0 - vLife);
     }
 
     gl_FragColor = vec4(finalColor, alpha);
@@ -204,6 +214,20 @@ export class VFXEngine {
                     this.velocities[i*3+1] = (Math.random() - 0.5) * 5.0;
                     this.velocities[i*3+2] = (Math.random() - 0.5) * 2.0;
                     this.sizes[i] = Math.random() * 20 + 5;
+                } else if (typeInt === 0) { // Dr Strange Shield
+                    this.colors[i*3] = 1.0; this.colors[i*3+1] = 0.6; this.colors[i*3+2] = 0.1; // Golden
+                    // Velocity acts as parameters: x=angle, y=radius, z=depth jitter
+                    this.velocities[i*3] = Math.random() * Math.PI * 2; // Angle
+                    
+                    // Create multiple geometric rings
+                    const rand = Math.random();
+                    let radius = 0.5;
+                    if (rand > 0.8) radius = 0.8; // Outer ring
+                    else if (rand > 0.6) radius = 0.2; // Inner ring
+                    
+                    this.velocities[i*3+1] = radius; 
+                    this.velocities[i*3+2] = (Math.random() - 0.5) * 0.1;
+                    this.sizes[i] = Math.random() * 30 + 10;
                 } else { // Generic magic/shield
                     this.colors[i*3] = 0.2; this.colors[i*3+1] = 0.6; this.colors[i*3+2] = 1.0;
                     this.velocities[i*3] = (Math.random() - 0.5) * 1.0;
@@ -249,6 +273,7 @@ export class VFXEngine {
             if (this.activeEffect === "thumbs_up") pCount = 15;
             if (this.activeEffect === "two_finger") pCount = 2;
             if (this.activeEffect === "fire_throw") pCount = 20;
+            if (this.activeEffect === "open_palm") pCount = 25; // Dense sparkling shield
             
             this.spawnParticles(pCount, this.material.uniforms.uEffectType.value);
         }
