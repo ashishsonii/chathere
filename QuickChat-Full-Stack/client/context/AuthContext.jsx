@@ -6,12 +6,17 @@ import { io } from "socket.io-client"
 
 const backendUrl = import.meta.env.VITE_BACKEND_URL;
 axios.defaults.baseURL = backendUrl;
+// Set token synchronously before any component mounts
+const initialToken = localStorage.getItem("token");
+if (initialToken) {
+    axios.defaults.headers.common["token"] = initialToken;
+}
 
 export const AuthContext = createContext();
 
 export const AuthProvider = ({ children })=>{
 
-    const [token, setToken] = useState(localStorage.getItem("token"));
+    const [token, setToken] = useState(initialToken);
     const [authUser, setAuthUser] = useState(() => {
         try {
             const saved = localStorage.getItem("authUser");
@@ -128,9 +133,6 @@ const login = async (state, credentials)=>{
     }
 
     useEffect(()=>{
-        if(token){
-            axios.defaults.headers.common["token"] = token;
-        }
         checkAuth();
     },[])
 
