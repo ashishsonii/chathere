@@ -156,9 +156,16 @@ export class VFXEngine {
         this.particleSystem.frustumCulled = false; // Prevent particle clipping
         this.scene.add(this.webLines);
 
-        // --- NEW GRAPHICAL DR STRANGE SHIELD MESH ---
-        const textureLoader = new THREE.TextureLoader();
-        const shieldTexture = textureLoader.load('/magic_shield.png');
+        // --- NEW GRAPHICAL DR STRANGE SHIELD MESH (ANIMATED VIDEO) ---
+        const video = document.createElement('video');
+        video.src = '/shield.mp4';
+        video.loop = true;
+        video.muted = true;
+        video.playsInline = true;
+        video.crossOrigin = 'anonymous';
+        video.play().catch(e => console.warn("Video autoplay blocked:", e));
+        
+        const shieldTexture = new THREE.VideoTexture(video);
         
         this.shieldMaterial = new THREE.MeshBasicMaterial({
             map: shieldTexture,
