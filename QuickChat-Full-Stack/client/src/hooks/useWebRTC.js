@@ -245,10 +245,7 @@ export const useWebRTC = (socket, userId, axios) => {
                 autoGainControl: true
             },
             video: type === "video" ? {
-                width: { ideal: 1280, max: 1920 },
-                height: { ideal: 720, max: 1080 },
-                frameRate: { ideal: 30, max: 60 },
-                facingMode: "user"
+                facingMode: "user" // Safari works best with bare-minimum constraints
             } : false
         };
 
@@ -258,10 +255,10 @@ export const useWebRTC = (socket, userId, axios) => {
         } catch (primaryErr) {
             console.warn("[WebRTC] Primary getUserMedia failed, trying fallback:", primaryErr.name);
             try {
-                // Minimal constraints — works on the widest range of devices/OS
+                // Absolute fallback
                 stream = await navigator.mediaDevices.getUserMedia({
                     audio: true,
-                    video: type === "video"
+                    video: type === "video" ? true : false
                 });
             } catch (fallbackErr) {
                 console.error("[WebRTC] Media access totally failed:", fallbackErr);
