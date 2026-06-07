@@ -7,6 +7,12 @@ const formatDuration = (seconds) => {
     return `${m}:${s}`;
 };
 
+// Fit modes for the remote video
+const FIT_MODES = [
+    { id: 'contain', label: 'Fit', desc: 'Full view, no crop' },
+    { id: 'cover', label: 'Fill', desc: 'Fill screen, may crop' },
+];
+
 const VideoCallScreen = () => {
     const { 
         callState, 
@@ -35,6 +41,11 @@ const VideoCallScreen = () => {
     const [controlsVisible, setControlsVisible] = useState(true);
     const [showAudioPicker, setShowAudioPicker] = useState(false);
     const hideTimerRef = useRef(null);
+
+    // --- Orientation & fit ---
+    const [forceLandscape, setForceLandscape] = useState(false);
+    const [fitMode, setFitMode] = useState('contain'); // 'contain' | 'cover'
+    const [zoomLevel, setZoomLevel] = useState(1); // 1 = 100%, range 0.5 – 2.0
 
     const resetHideTimer = useCallback(() => {
         setControlsVisible(true);
@@ -85,7 +96,6 @@ const VideoCallScreen = () => {
         if (el && remoteStream) {
             el.srcObject = remoteStream;
             el.play().catch(() => {});
-            // Apply audio output device
             if (selectedAudioOutput && typeof el.setSinkId === 'function') {
                 el.setSinkId(selectedAudioOutput).catch(() => {});
             }
@@ -101,29 +111,63 @@ const VideoCallScreen = () => {
         }
     }, [localStream]);
 
+    // Toggle landscape mode: try native orientation lock, fallback to CSS rotation
+    const toggleLandscape = useCallback(() => {
+        if (!forceLandscape) {
+            // Try to lock to landscape via Screen Orientation API
+            try {
+                screen.orientation?.lock?.('landscape').catch(() => {});
+            } catch(e) {}
+        } else {
+            try {
+                screen.orientation?.unlock?.();
+            } catch(e) {}
+        }
+        setForceLandscape(prev => !prev);
+    }, [forceLandscape]);
+
     if (callState !== "connected" || currentCall?.type !== "video") return null;
 
-    // Cinema mode: when remote peer is screen sharing, optimize for landscape content viewing
     const isCinemaMode = remoteIsScreenSharing;
+
+    // Landscape CSS rotation for devices that don't support orientation lock
+    const landscapeStyle = forceLandscape ? {
+        transform: 'rotate(90deg)',
+        transformOrigin: 'center center',
+        width: '100vh',
+        height: '100vw',
+        position: 'fixed',
+        top: '50%',
+        left: '50%',
+        marginTop: 'calc(-50vw)',
+        marginLeft: 'calc(-50vh)',
+    } : {};
 
     return (
         <div 
             ref={containerRef}
             className="fixed inset-0 z-40 bg-black flex flex-col"
+            style={forceLandscape ? landscapeStyle : {}}
             onClick={resetHideTimer}
             onMouseMove={resetHideTimer}
             onTouchStart={resetHideTimer}
         >
             
             {/* Remote Video (Full Screen) */}
-            <div className="flex-1 relative w-full h-full">
+            <div className="flex-1 relative w-full h-full overflow-hidden">
                 {remoteStream ? (
                     <video 
                         ref={setRemoteVideoRef} 
                         autoPlay 
                         playsInline 
-                        className={`w-full h-full ${isCinemaMode ? 'object-contain' : 'object-cover'}`}
-                        style={isCinemaMode ? { background: '#000' } : {}}
+                        className={`w-full h-full`}
+                        style={{ 
+                            objectFit: fitMode,
+                            background: '#000',
+                            transform: `scale(${zoomLevel})`,
+                            transformOrigin: 'center center',
+                            transition: 'transform 0.2s ease'
+                        }}
                     />
                 ) : (
                     <div className="w-full h-full flex items-center justify-center bg-gray-900">
@@ -136,7 +180,7 @@ const VideoCallScreen = () => {
 
                 {/* Cinema mode indicator */}
                 {isCinemaMode && controlsVisible && (
-                    <div className="absolute top-16 left-1/2 -translate-x-1/2 px-4 py-1.5 bg-blue-500/80 rounded-full text-white text-xs font-medium backdrop-blur-sm flex items-center gap-2 animate-fade-in">
+                    <div className="absolute top-16 left-1/2 -translate-x-1/2 px-4 py-1.5 bg-blue-500/80 rounded-full text-white text-xs font-medium backdrop-blur-sm flex items-center gap-2">
                         <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" d="M9 17.25v1.007a3 3 0 01-.879 2.122L7.5 21h9l-.621-.621A3 3 0 0115 18.257V17.25m6-12V15a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 15V5.25A2.25 2.25 0 015.25 3h13.5A2.25 2.25 0 0121 5.25z" />
                         </svg>
@@ -175,15 +219,48 @@ const VideoCallScreen = () => {
                         <p className="text-gray-300 font-mono">{formatDuration(callDuration)}</p>
                     </div>
                 </div>
+
+                {/* --- Zoom & Fit controls (right side, vertical) --- */}
+                <div className={`absolute right-3 top-1/2 -translate-y-1/2 flex flex-col items-center gap-2 transition-opacity duration-300 ${controlsVisible ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
+                    {/* Zoom In */}
+                    <button 
+                        onClick={() => setZoomLevel(prev => Math.min(prev + 0.15, 2.5))}
+                        className="w-9 h-9 rounded-full bg-gray-800/80 text-white flex items-center justify-center text-lg font-bold backdrop-blur-sm hover:bg-gray-700 border border-white/10"
+                        title="Zoom in"
+                    >+</button>
+                    
+                    {/* Zoom indicator */}
+                    <span className="text-white/70 text-[10px] font-mono">{Math.round(zoomLevel * 100)}%</span>
+
+                    {/* Zoom Out */}
+                    <button 
+                        onClick={() => setZoomLevel(prev => Math.max(prev - 0.15, 0.5))}
+                        className="w-9 h-9 rounded-full bg-gray-800/80 text-white flex items-center justify-center text-lg font-bold backdrop-blur-sm hover:bg-gray-700 border border-white/10"
+                        title="Zoom out"
+                    >−</button>
+
+                    {/* Reset zoom */}
+                    {zoomLevel !== 1 && (
+                        <button 
+                            onClick={() => setZoomLevel(1)}
+                            className="w-9 h-9 rounded-full bg-gray-800/80 text-white flex items-center justify-center backdrop-blur-sm hover:bg-gray-700 border border-white/10"
+                            title="Reset zoom"
+                        >
+                            <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182" />
+                            </svg>
+                        </button>
+                    )}
+                </div>
             </div>
 
-            {/* Controls — auto-hides after 4s of no interaction */}
-            <div className={`absolute bottom-10 left-1/2 transform -translate-x-1/2 flex items-center gap-4 md:gap-6 bg-gray-900/80 px-6 md:px-8 py-4 rounded-full backdrop-blur-md shadow-2xl border border-white/10 transition-all duration-300 ${controlsVisible ? 'translate-y-0 opacity-100' : 'translate-y-20 opacity-0 pointer-events-none'}`}>
+            {/* Controls — auto-hides after 4s */}
+            <div className={`absolute bottom-10 left-1/2 transform -translate-x-1/2 flex items-center gap-3 md:gap-5 bg-gray-900/80 px-5 md:px-7 py-3.5 rounded-full backdrop-blur-md shadow-2xl border border-white/10 transition-all duration-300 ${controlsVisible ? 'translate-y-0 opacity-100' : 'translate-y-20 opacity-0 pointer-events-none'}`}>
                 
                 {/* Mute Button */}
                 <button 
                     onClick={toggleMute}
-                    className={`w-11 h-11 md:w-12 md:h-12 rounded-full flex items-center justify-center transition-colors ${isMuted ? 'bg-white text-black' : 'bg-gray-700 text-white hover:bg-gray-600'}`}
+                    className={`w-10 h-10 md:w-12 md:h-12 rounded-full flex items-center justify-center transition-colors ${isMuted ? 'bg-white text-black' : 'bg-gray-700 text-white hover:bg-gray-600'}`}
                 >
                     {isMuted ? (
                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
@@ -200,7 +277,7 @@ const VideoCallScreen = () => {
                 {/* Camera Toggle */}
                 <button 
                     onClick={toggleCamera}
-                    className={`w-11 h-11 md:w-12 md:h-12 rounded-full flex items-center justify-center transition-colors ${isCameraOff ? 'bg-white text-black' : 'bg-gray-700 text-white hover:bg-gray-600'}`}
+                    className={`w-10 h-10 md:w-12 md:h-12 rounded-full flex items-center justify-center transition-colors ${isCameraOff ? 'bg-white text-black' : 'bg-gray-700 text-white hover:bg-gray-600'}`}
                 >
                     {isCameraOff ? (
                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
@@ -214,10 +291,10 @@ const VideoCallScreen = () => {
                     )}
                 </button>
 
-                {/* Screen Share Button */}
+                {/* Screen Share */}
                 <button 
                     onClick={toggleScreenShare}
-                    className={`w-11 h-11 md:w-12 md:h-12 rounded-full flex items-center justify-center transition-colors ${isScreenSharing ? 'bg-blue-500 text-white ring-2 ring-blue-300' : 'bg-gray-700 text-white hover:bg-gray-600'}`}
+                    className={`w-10 h-10 md:w-12 md:h-12 rounded-full flex items-center justify-center transition-colors ${isScreenSharing ? 'bg-blue-500 text-white ring-2 ring-blue-300' : 'bg-gray-700 text-white hover:bg-gray-600'}`}
                     title={isScreenSharing ? 'Stop sharing' : 'Share screen'}
                 >
                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
@@ -225,11 +302,52 @@ const VideoCallScreen = () => {
                     </svg>
                 </button>
 
+                {/* Fit Mode Toggle: Fit ↔ Fill */}
+                <button 
+                    onClick={() => {
+                        const nextIdx = (FIT_MODES.findIndex(m => m.id === fitMode) + 1) % FIT_MODES.length;
+                        setFitMode(FIT_MODES[nextIdx].id);
+                    }}
+                    className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-gray-700 text-white hover:bg-gray-600 flex items-center justify-center transition-colors"
+                    title={`Current: ${FIT_MODES.find(m => m.id === fitMode)?.desc}`}
+                >
+                    {fitMode === 'contain' ? (
+                        /* Fit icon — arrows pointing inward */
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M9 9V4.5M9 9H4.5M9 9L3.75 3.75M9 15v4.5M9 15H4.5M9 15l-5.25 5.25M15 9h4.5M15 9V4.5M15 9l5.25-5.25M15 15h4.5M15 15v4.5m0-4.5l5.25 5.25" />
+                        </svg>
+                    ) : (
+                        /* Fill icon — arrows pointing outward */
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M3.75 20.25v-4.5m0 4.5h4.5m-4.5 0L9 15M20.25 3.75h-4.5m4.5 0v4.5m0-4.5L15 9m5.25 11.25h-4.5m4.5 0v-4.5m0 4.5L15 15" />
+                        </svg>
+                    )}
+                </button>
+
+                {/* Landscape/Portrait Toggle */}
+                <button 
+                    onClick={toggleLandscape}
+                    className={`w-10 h-10 md:w-12 md:h-12 rounded-full flex items-center justify-center transition-colors ${forceLandscape ? 'bg-amber-500 text-white' : 'bg-gray-700 text-white hover:bg-gray-600'}`}
+                    title={forceLandscape ? 'Switch to Portrait' : 'Switch to Landscape'}
+                >
+                    {forceLandscape ? (
+                        /* Portrait icon */
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 1.5H8.25A2.25 2.25 0 006 3.75v16.5a2.25 2.25 0 002.25 2.25h7.5A2.25 2.25 0 0018 20.25V3.75a2.25 2.25 0 00-2.25-2.25H13.5m-3 0V3h3V1.5m-3 0h3" />
+                        </svg>
+                    ) : (
+                        /* Landscape icon */
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 1.5H8.25A2.25 2.25 0 006 3.75v16.5a2.25 2.25 0 002.25 2.25h7.5A2.25 2.25 0 0018 20.25V3.75a2.25 2.25 0 00-2.25-2.25H13.5m-3 0V3h3V1.5m-3 0h3" style={{transform: 'rotate(90deg)'}} />
+                        </svg>
+                    )}
+                </button>
+
                 {/* Audio Output Picker */}
                 <div className="relative">
                     <button 
                         onClick={() => setShowAudioPicker(!showAudioPicker)}
-                        className={`w-11 h-11 md:w-12 md:h-12 rounded-full flex items-center justify-center transition-colors ${showAudioPicker ? 'bg-violet-500 text-white' : 'bg-gray-700 text-white hover:bg-gray-600'}`}
+                        className={`w-10 h-10 md:w-12 md:h-12 rounded-full flex items-center justify-center transition-colors ${showAudioPicker ? 'bg-violet-500 text-white' : 'bg-gray-700 text-white hover:bg-gray-600'}`}
                         title="Audio output"
                     >
                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
@@ -239,7 +357,7 @@ const VideoCallScreen = () => {
 
                     {/* Audio Output Dropdown */}
                     {showAudioPicker && audioOutputDevices.length > 0 && (
-                        <div className="absolute bottom-full mb-3 left-1/2 -translate-x-1/2 bg-gray-800 rounded-xl shadow-2xl border border-gray-600/50 py-2 min-w-[200px] max-w-[280px] backdrop-blur-md">
+                        <div className="absolute bottom-full mb-3 right-0 bg-gray-800 rounded-xl shadow-2xl border border-gray-600/50 py-2 min-w-[200px] max-w-[280px] backdrop-blur-md">
                             <p className="text-gray-400 text-xs font-semibold px-4 py-1 uppercase tracking-wider">Audio Output</p>
                             {audioOutputDevices.map((device) => (
                                 <button
@@ -271,7 +389,7 @@ const VideoCallScreen = () => {
                 {/* End Call Button */}
                 <button 
                     onClick={endCall}
-                    className="w-13 h-13 md:w-14 md:h-14 rounded-full bg-red-500 hover:bg-red-600 flex items-center justify-center shadow-lg transition-transform hover:scale-110 ml-1"
+                    className="w-12 h-12 md:w-14 md:h-14 rounded-full bg-red-500 hover:bg-red-600 flex items-center justify-center shadow-lg transition-transform hover:scale-110 ml-1"
                 >
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-white transform rotate-[135deg]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
