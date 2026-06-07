@@ -30,6 +30,8 @@ void main() {
         pos += velocity * (uTime * 5.0);
     } else if (uEffectType == 5) { // Fire Throw (Push)
         pos += velocity * (uTime * 15.0);
+    } else if (uEffectType == 6) { // Web Sparkles
+        pos += velocity * uTime * 5.0; // Fast scattered sparkles
     } else { // Dr Strange Shield (Open Palm)
         // velocity.x = base angle, velocity.y = radius
         float angle = velocity.x + uTime * 3.0; // Spin speed
@@ -72,6 +74,10 @@ void main() {
     } else if (uEffectType == 2) { // Lightning
         finalColor = vec3(0.5, 0.8, 1.0);
         if (ll < 0.1) finalColor = vec3(1.0); // Hot core
+    } else if (uEffectType == 6) { // Web Sparkles
+        finalColor = mix(vec3(0.0, 1.0, 1.0), vec3(0.5, 0.0, 1.0), vLife); // Cyan to purple
+        float star = 0.05 / (ll + 0.01);
+        alpha = star * (1.0 - vLife) * 1.5;
     } else if (uEffectType == 0) { // Dr Strange Shield (Reverted to Blue/Cyan)
         finalColor = mix(vec3(0.2, 0.8, 1.0), vec3(0.0, 0.3, 1.0), vLife);
         // Star sparkle texture
@@ -196,6 +202,7 @@ export class VFXEngine {
             this.webLines.visible = true;
             this.hand1Points = hand1;
             this.hand2Points = hand2;
+            this.material.uniforms.uEffectType.value = 6;
             
             // Map the 5 fingers
             for (let i = 0; i < 5; i++) {
@@ -354,15 +361,8 @@ export class VFXEngine {
             if (this.activeEffect === "open_palm") pCount = 25; // Dense sparkling shield
             
             if (this.activeEffect === "connect_webs") {
-                // Animate jitter on the web lines
-                const positions = this.webGeometry.attributes.position.array;
-                for(let i=0; i<30; i++) {
-                    positions[i] += (Math.random() - 0.5) * 0.05;
-                }
-                this.webGeometry.attributes.position.needsUpdate = true;
-                
-                // Spawn sparkles
-                this.spawnParticles(15, 6);
+                // Spawn dense sparkles along the web lines
+                this.spawnParticles(30, 6);
             } else {
                 this.spawnParticles(pCount, this.material.uniforms.uEffectType.value);
             }
