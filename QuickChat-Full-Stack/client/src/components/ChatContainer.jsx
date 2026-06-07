@@ -84,8 +84,8 @@ const ChatContainer = () => {
 
     // Auto scroll management
     useEffect(()=>{
-        if (isFirstLoad.current && scrollEnd.current && messages) {
-            scrollEnd.current.scrollIntoView({ behavior: "auto" });
+        if (scrollEnd.current && messages && !isLoadingMore) {
+            scrollEnd.current.scrollIntoView({ behavior: "smooth" });
         }
     },[messages])
 
@@ -181,15 +181,15 @@ const ChatContainer = () => {
                         </div>
                     ))}
                     {typingStatus[selectedUser?._id] && selectedUser?._id !== authUser?._id && (
-                        <div className="flex items-end gap-2 justify-end flex-row-reverse">
-                            <div className="p-3 px-4 w-[70px] md:text-sm font-light rounded-lg mb-8 bg-violet-500/30 text-white rounded-bl-none flex items-center justify-between">
-                                <span className="w-1.5 h-1.5 bg-gray-300 rounded-full animate-bounce" style={{ animationDelay: '0s' }}></span>
-                                <span className="w-1.5 h-1.5 bg-gray-300 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></span>
-                                <span className="w-1.5 h-1.5 bg-gray-300 rounded-full animate-bounce" style={{ animationDelay: '0.4s' }}></span>
-                            </div>
+                        <div className="flex items-end gap-2 justify-start">
                             <div className="text-center text-xs shrink-0">
                                 <img src={selectedUser?.profilePic || assets.avatar_icon} alt="" className="w-7 rounded-full" />
                                 <p className="text-gray-500 text-[10px] mt-1">Typing</p>
+                            </div>
+                            <div className="p-3 px-4 w-[70px] md:text-sm font-light rounded-lg mb-8 bg-violet-500/30 text-white flex items-center justify-between">
+                                <span className="w-1.5 h-1.5 bg-gray-300 rounded-full animate-bounce" style={{ animationDelay: '0s' }}></span>
+                                <span className="w-1.5 h-1.5 bg-gray-300 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></span>
+                                <span className="w-1.5 h-1.5 bg-gray-300 rounded-full animate-bounce" style={{ animationDelay: '0.4s' }}></span>
                             </div>
                         </div>
                     )}
