@@ -169,7 +169,7 @@ export class VFXEngine {
             opacity: 0.9
         });
         
-        this.shieldMesh = new THREE.Mesh(new THREE.PlaneGeometry(3, 3), this.shieldMaterial);
+        this.shieldMesh = new THREE.Mesh(new THREE.PlaneGeometry(1.2, 1.2), this.shieldMaterial);
         this.shieldMesh.visible = false;
         this.scene.add(this.shieldMesh);
 
@@ -180,7 +180,7 @@ export class VFXEngine {
         this.hand2Points = null;
         this.webBase1 = [new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()];
         this.webBase2 = [new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()];
-        this.clock = new THREE.Clock();
+        this.lastTime = performance.now();
         this.animationId = null;
 
         this.resize();
@@ -360,7 +360,10 @@ export class VFXEngine {
     animate() {
         this.animationId = requestAnimationFrame(this.animate.bind(this));
         
-        const dt = this.clock.getDelta();
+        const now = performance.now();
+        const dt = (now - this.lastTime) / 1000.0;
+        this.lastTime = now;
+        
         this.material.uniforms.uTime.value += dt;
 
         // Age particles
