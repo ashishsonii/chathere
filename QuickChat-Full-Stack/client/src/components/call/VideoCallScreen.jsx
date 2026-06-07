@@ -1,5 +1,7 @@
 import React, { useContext, useEffect, useRef, useCallback, useState } from 'react';
 import { CallContext } from '../../../context/CallContext';
+import { gestureEngine } from '../../../services/GestureEngine';
+import { VFXCanvas } from '../vfx/VFXCanvas';
 
 const formatDuration = (seconds) => {
     const m = Math.floor(seconds / 60).toString().padStart(2, '0');
@@ -30,12 +32,16 @@ const VideoCallScreen = () => {
         audioOutputDevices,
         selectedAudioOutput,
         localStream,
-        remoteStream
+        remoteStream,
+        lastGestureEvent,
+        sendGestureEvent
     } = useContext(CallContext);
 
     const localVideoRef = useRef(null);
     const remoteVideoRef = useRef(null);
     const containerRef = useRef(null);
+    const localVFXRef = useRef(null);
+    const remoteVFXRef = useRef(null);
 
     // --- Auto-hide controls ---
     const [controlsVisible, setControlsVisible] = useState(true);
@@ -101,6 +107,18 @@ const VideoCallScreen = () => {
         }
     }, [localStream]);
 
+    // --- Gesture & VFX Integration ---
+    // Listen to remote gesture events
+    useEffect(() => {
+        if (lastGestureEvent && remoteVFXRef.current) {
+            remoteVFXRef.current.triggerEffect(
+                lastGestureEvent.gesture,
+                lastGestureEvent.x,
+                lastGestureEvent.y
+            );
+        }
+    }, [lastGestureEvent]);
+
     // Bind remote stream to remote video element
     useEffect(() => {
         if (remoteVideoRef.current && remoteStream) {
@@ -137,8 +155,23 @@ const VideoCallScreen = () => {
         if (el && localStream) {
             el.srcObject = localStream;
             el.play().catch(() => {});
+            
+            // Start gesture detection once video is ready
+            if (callState === 'connected') {
+                gestureEngine.initialize().then(() => {
+                    gestureEngine.start(el, (event) => {
+                        if (localVFXRef.current) {
+                            localVFXRef.current.triggerEffect(event.gesture, event.x, event.y);
+                        }
+                        if (sendGestureEvent) sendGestureEvent(event);
+                    });
+                });
+            }
+        } else {
+            // Cleanup when video unmounts
+            gestureEngine.stop();
         }
-    }, [localStream]);
+    }, [localStream, callState, sendGestureEvent]);
 
     // Toggle landscape mode: try native orientation lock, fallback to CSS rotation
     const toggleLandscape = useCallback(() => {
@@ -184,19 +217,22 @@ const VideoCallScreen = () => {
             {/* Remote Video (Full Screen) */}
             <div className="flex-1 relative w-full h-full overflow-hidden">
                 {remoteStream ? (
-                    <video 
-                        ref={setRemoteVideoRef} 
-                        autoPlay 
-                        playsInline 
-                        className={`w-full h-full`}
-                        style={{ 
-                            objectFit: fitMode,
-                            background: '#000',
-                            transform: `scale(${zoomLevel})`,
-                            transformOrigin: 'center center',
-                            transition: 'transform 0.2s ease'
-                        }}
-                    />
+                    <>
+                        <video 
+                            ref={setRemoteVideoRef} 
+                            autoPlay 
+                            playsInline 
+                            className={`w-full h-full`}
+                            style={{ 
+                                objectFit: fitMode,
+                                background: '#000',
+                                transform: `scale(${zoomLevel})`,
+                                transformOrigin: 'center center',
+                                transition: 'transform 0.2s ease'
+                            }}
+                        />
+                        <VFXCanvas ref={remoteVFXRef} className="absolute inset-0 z-10 pointer-events-none" />
+                    </>
                 ) : (
                     <div className="w-full h-full flex items-center justify-center bg-gray-900">
                         <div className="flex flex-col items-center gap-4">
@@ -225,14 +261,17 @@ const VideoCallScreen = () => {
                     } ${controlsVisible ? 'translate-y-0' : '-translate-y-2'}`}
                 >
                     {localStream && !isCameraOff ? (
-                        <video 
-                            ref={setLocalVideoRef} 
-                            autoPlay 
-                            playsInline 
-                            muted 
-                            className="w-full h-full object-cover" 
-                            style={isScreenSharing ? {} : { transform: "scaleX(-1)" }}
-                        />
+                        <>
+                            <video 
+                                ref={setLocalVideoRef} 
+                                autoPlay 
+                                playsInline 
+                                muted 
+                                className="w-full h-full object-cover" 
+                                style={isScreenSharing ? {} : { transform: "scaleX(-1)" }}
+                            />
+                            <VFXCanvas ref={localVFXRef} className="absolute inset-0 z-10 pointer-events-none" />
+                        </>
                     ) : (
                         <div className="w-full h-full flex items-center justify-center bg-gray-800 text-gray-500 text-xs">
                             Camera Off

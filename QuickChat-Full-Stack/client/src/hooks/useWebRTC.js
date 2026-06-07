@@ -11,7 +11,7 @@ const ICE_SERVERS = {
     iceCandidatePoolSize: 10
 };
 
-export const useWebRTC = (socket, userId, axios) => {
+export const useWebRTC = (socket, userId, axios, onGestureReceived) => {
     const [localStream, setLocalStream] = useState(null);
     const [remoteStream, setRemoteStream] = useState(null);
     const [isMuted, setIsMuted] = useState(false);
@@ -29,6 +29,7 @@ export const useWebRTC = (socket, userId, axios) => {
     const cameraStreamRef = useRef(null); // Stores original camera stream during screen share
     const isScreenSharingRef = useRef(false); // Synchronous guard against stale closures
     const screenShareLockRef = useRef(false); // Prevents double-click race conditions
+    const dataChannelRef = useRef(null); // RTCDataChannel for VFX syncing
 
     // Initialize RTCPeerConnection.
     // `explicitStream` lets callers pass the stream directly to bypass any
@@ -43,6 +44,10 @@ export const useWebRTC = (socket, userId, axios) => {
             peerConnection.current.onconnectionstatechange = null;
             peerConnection.current.close();
             peerConnection.current = null;
+        }
+        if (dataChannelRef.current) {
+            dataChannelRef.current.close();
+            dataChannelRef.current = null;
         }
         pendingCandidates.current = [];
 
@@ -102,7 +107,37 @@ export const useWebRTC = (socket, userId, axios) => {
             console.log(`[WebRTC] Connection state: ${pc.connectionState}`);
         };
 
-        // 4. Add local media tracks to the peer connection.
+        // 4. DataChannel for VFX Sync
+        const setupDataChannel = (channel) => {
+            channel.onopen = () => console.log(`[WebRTC] DataChannel ${channel.label} opened`);
+            channel.onclose = () => console.log(`[WebRTC] DataChannel ${channel.label} closed`);
+            channel.onmessage = (event) => {
+                try {
+                    const data = JSON.parse(event.data);
+                    if (data.type === "gesture" && onGestureReceived) {
+                        onGestureReceived(data);
+                    }
+                } catch (e) {
+                    console.warn("[WebRTC] Failed to parse DataChannel message:", e);
+                }
+            };
+            dataChannelRef.current = channel;
+        };
+
+        if (isInitiator) {
+            // Caller creates the data channel
+            const channel = pc.createDataChannel("vfx_sync");
+            setupDataChannel(channel);
+        } else {
+            // Receiver listens for the data channel
+            pc.ondatachannel = (event) => {
+                if (event.channel.label === "vfx_sync") {
+                    setupDataChannel(event.channel);
+                }
+            };
+        }
+
+        // 5. Add local media tracks to the peer connection.
         //    Priority: explicit param > synchronous ref > React state
         const mediaStream = explicitStream || localStreamRef.current;
         if (mediaStream) {
@@ -115,7 +150,7 @@ export const useWebRTC = (socket, userId, axios) => {
         }
 
         return pc;
-    }, [socket, axios]); // localStream deliberately excluded — we use the ref
+    }, [socket, axios, onGestureReceived]); // localStream deliberately excluded — we use the ref
 
     // Create an SDP offer (caller side)
     const createOffer = useCallback(async (callId, remoteUserId) => {
@@ -465,6 +500,18 @@ export const useWebRTC = (socket, userId, axios) => {
         // on its <video> elements, since setSinkId is a DOM API on HTMLMediaElement
     }, []);
 
+    // Broadcast gesture events to the remote peer
+    const sendGestureEvent = useCallback((gestureData) => {
+        const channel = dataChannelRef.current;
+        if (channel && channel.readyState === "open") {
+            channel.send(JSON.stringify({
+                type: "gesture",
+                ...gestureData,
+                timestamp: Date.now()
+            }));
+        }
+    }, []);
+
     const cleanup = useCallback(() => {
         if (peerConnection.current) {
             peerConnection.current.ontrack = null;
@@ -505,6 +552,7 @@ export const useWebRTC = (socket, userId, axios) => {
         toggleCamera,
         toggleScreenShare,
         changeAudioOutput,
+        sendGestureEvent,
         cleanup
     };
 };
