@@ -10,20 +10,39 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Deploy to EC2
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '20'
+
+      - name: Build Frontend
+        working-directory: ./QuickChat-Full-Stack/client
+        run: |
+          npm install
+          npm run build
+
+      - name: Copy Frontend Dist to EC2
+        uses: appleboy/scp-action@master
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          source: "QuickChat-Full-Stack/client/dist"
+          target: "~/chathere"
+
+      - name: Deploy Backend to EC2
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
-
           script: |
             set -e
             cd ~/chathere/QuickChat-Full-Stack
             git pull origin main
-            cd client
-            npm install
-            npm run build
-            cd ../server
+            cd server
             npm install
             pm2 restart all
