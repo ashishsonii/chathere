@@ -10,7 +10,7 @@ const messageSchema = new mongoose.Schema({
 }, {timestamps: true});
 
 messageSchema.index({ conversationId: 1, createdAt: -1 });
-messageSchema.index({ createdAt: 1 }, { expireAfterSeconds: 172800 }); // 48-hour expiration TTL
+messageSchema.index({ createdAt: 1 }, { expireAfterSeconds: 3600 }); // 1-hour expiration TTL
 
 const Message = mongoose.model("Message", messageSchema);
 
