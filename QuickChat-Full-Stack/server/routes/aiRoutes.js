@@ -6,18 +6,19 @@ const router = express.Router();
 
 router.post("/generate", protectRoute, async (req, res) => {
   try {
-    const { prompt, type } = req.body;
+    const { prompt, type, image } = req.body;
     const userId = req.user._id;
 
-    if (!prompt) {
-      return res.status(400).json({ error: "Prompt is required" });
+    if (!prompt && !image) {
+      return res.status(400).json({ error: "Prompt or image is required" });
     }
 
     // Add job to BullMQ queue
     await aiQueue.add("generate-ai-response", {
       prompt,
       userId,
-      type: type || "text"
+      type: type || "text",
+      image: image || null
     }, {
       removeOnComplete: true, // Keep Redis clean
       removeOnFail: 10,       // Keep last 10 failed jobs for debugging

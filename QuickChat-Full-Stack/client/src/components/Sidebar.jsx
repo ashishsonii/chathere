@@ -168,10 +168,10 @@ const Sidebar = () => {
                                     onClick={() => setSelectedUser(orryAiUser)}
                                     className={`relative flex items-center gap-2 p-2 pl-4 rounded cursor-pointer max-sm:text-sm transition-all ${selectedUser?._id === orryAiUser._id ? 'bg-[#282142]/50 border-l-4 border-indigo-500' : 'hover:bg-[#282142]/20'} mb-1 border border-indigo-500/30 bg-gradient-to-r from-blue-500/10 to-indigo-600/10 shadow-sm`}
                                 >
-                                    <img src={assets.orry_avatar} alt="Orry AI" className="w-[35px] h-[35px] rounded-full object-cover border-2 border-indigo-500 shadow-md" />
+                                    <img src={assets.orry_avatar} alt="Orry" className="w-[35px] h-[35px] rounded-full object-cover border-2 border-indigo-500 shadow-md" />
                                     <div className='flex flex-col leading-5 flex-1 min-w-0'>
                                         <div className='flex justify-between items-center gap-2'>
-                                            <p className='truncate font-medium text-white'>Orry AI</p>
+                                            <p className='truncate font-medium text-white'>Orry</p>
                                             <span className='w-2 h-2 rounded-full bg-green-400 shrink-0 shadow-[0_0_8px_rgba(74,222,128,0.6)]'></span>
                                         </div>
                                         <p className='text-xs truncate text-indigo-300 font-medium'>

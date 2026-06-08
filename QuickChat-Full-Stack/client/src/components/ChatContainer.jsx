@@ -234,7 +234,7 @@ const ChatContainer = () => {
                 {selectedUser?.isAi && messages.length === 0 && (
                     <div className="flex flex-col items-center justify-center h-full text-center px-4 mt-10">
                         <img src={selectedUser.profilePic || assets.orry_avatar} alt="Orry AI" className="w-24 h-24 rounded-full border-4 border-indigo-500/30 mb-4 shadow-[0_0_20px_rgba(99,102,241,0.2)] animate-pulse" />
-                        <h2 className="text-2xl font-bold text-white mb-2">I am Orry AI 🤖</h2>
+                        <h2 className="text-2xl font-bold text-white mb-2">I am Orry 🤖</h2>
                         <p className="text-sm text-gray-400 max-w-md mb-8">
                             Your personal intelligent assistant! Ask me anything, or generate beautiful images using the <span className="text-indigo-400 font-mono">/image</span> command.
                         </p>
@@ -309,7 +309,7 @@ const ChatContainer = () => {
                         value={input}
                         onKeyDown={(e) => e.key === "Enter" ? handleSendMessage(e) : null}
                         type="text"
-                        placeholder={selectedUser?.isAi ? "Ask Orry AI anything or type /image..." : "Send a message"}
+                        placeholder={selectedUser?.isAi ? "Ask Orry anything or type /image..." : "Send a message"}
                         className='flex-1 text-sm p-3 border-none rounded-lg outline-none text-white placeholder-gray-400'
                     />
                     <input onChange={handleSendImage} type="file" id='image' accept='image/png, image/jpeg' hidden />
