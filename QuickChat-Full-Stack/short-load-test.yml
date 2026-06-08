@@ -1,0 +1,14 @@
+config:
+  target: "https://api.ashishdev.run.place"
+  phases:
+    - duration: 5
+      arrivalRate: 10
+      name: "Short Test Phase"
+
+scenarios:
+  - name: "Short Sustained Load"
+    flow:
+      - get:
+          url: "/api/status"
+      - get:
+          url: "/api/auth/check"

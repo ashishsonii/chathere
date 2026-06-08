@@ -8,10 +8,12 @@ import { connectDB } from "./lib/db.js";
 import userRouter from "./routes/userRoutes.js";
 import messageRouter from "./routes/messageRoutes.js";
 import callRoutes from "./routes/callRoutes.js";
+import aiRoutes from "./routes/aiRoutes.js";
 import { Server } from "socket.io";
 import { runMigration } from "./lib/migrate.js";
 import redis from "./lib/redis.js";
 import { setupCallSignaling, handleCallDisconnect } from "./services/callSignaling.js";
+import { initWorker } from "./workers/aiWorker.js";
 
 // Create Express app and HTTP server
 const app = express();
@@ -41,6 +43,8 @@ subClient.on("error", (err) => console.error("Socket.io Redis SubClient Error:",
 
 io.adapter(createAdapter(pubClient, subClient));
 
+// Initialize BullMQ AI Worker
+initWorker(io);
 
 // Store online users
 export const userSocketMap = {}; // { userId: socketId }
@@ -109,6 +113,7 @@ app.use("/api/status", (req, res)=> res.send("Server is live"));
 app.use("/api/auth", userRouter);
 app.use("/api/messages", messageRouter);
 app.use("/api/calls", callRoutes);
+app.use("/api/ai", aiRoutes);
 
 
 

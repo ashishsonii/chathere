@@ -10,16 +10,18 @@ const ChatContainer = () => {
 
     const {
         messages,
+        setMessages,
         selectedUser,
         setSelectedUser,
         sendMessage,
         getMessages,
         typingStatus,
+        setTypingStatus,
         hasMore,
         loadMoreMessages
     } = useContext(ChatContext)
 
-    const { authUser, onlineUsers, socket } = useContext(AuthContext)
+    const { authUser, onlineUsers, socket, axios } = useContext(AuthContext)
     const { initiateCall } = useContext(CallContext)
 
     const scrollEnd = useRef()
@@ -35,12 +37,38 @@ const ChatContainer = () => {
         e.preventDefault();
         if (input.trim() === "") return null;
         isFirstLoad.current = true; // Force scroll to bottom on new message
-        await sendMessage({ text: input.trim() });
+
+        if (selectedUser?.isAi) {
+            // Native AI Chat Integration
+            const userMsgText = input.trim();
+            const isImageReq = userMsgText.startsWith("/image");
+            
+            // 1. Optimistically append user message to UI
+            setMessages(prev => [...prev, { _id: Date.now(), senderId: authUser._id, text: userMsgText, createdAt: new Date() }]);
+            // 2. Add loading state / typing indicator for Orry AI
+            setTypingStatus(prev => ({...prev, [selectedUser._id]: true}));
+            
+            try {
+                // 3. Post to AI endpoint
+                await axios.post("/api/ai/generate", { prompt: userMsgText, type: isImageReq ? "image" : "text" });
+            } catch (err) {
+                toast.error("Failed to reach Orry AI.");
+                setTypingStatus(prev => ({...prev, [selectedUser._id]: false}));
+            }
+        } else {
+            // Normal User Chat
+            await sendMessage({ text: input.trim() });
+        }
         setInput("")
     }
 
     // Handle sending an image
     const handleSendImage = async (e) => {
+        if (selectedUser?.isAi) {
+            toast.error("Orry AI cannot receive images yet!");
+            return;
+        }
+
         const file = e.target.files[0];
         if (!file || !file.type.startsWith("image/")) {
             toast.error("select an image file")
@@ -61,7 +89,7 @@ const ChatContainer = () => {
     const handleInputChange = (e) => {
         setInput(e.target.value);
 
-        if (!selectedUser) return;
+        if (!selectedUser || selectedUser.isAi) return;
 
         socket.emit("typing", {
             toUserId: selectedUser._id,
@@ -78,7 +106,17 @@ const ChatContainer = () => {
     useEffect(() => {
         if (selectedUser) {
             isFirstLoad.current = true;
-            getMessages(selectedUser._id)
+            if (selectedUser.isAi) {
+                // Initialize Orry AI chat
+                setMessages([{
+                    _id: "init",
+                    senderId: selectedUser._id,
+                    text: "Hello! I am Orry AI. How can I help you today? Prefix your message with /image to generate an image!",
+                    createdAt: new Date()
+                }]);
+            } else {
+                getMessages(selectedUser._id)
+            }
         }
     }, [selectedUser])
 
@@ -126,20 +164,24 @@ const ChatContainer = () => {
                 <img onClick={() => setSelectedUser(null)} src={assets.arrow_icon} alt="" className='md:hidden max-w-7 cursor-pointer' />
 
                 {/* Voice Call Button */}
+                {!selectedUser?.isAi && (
                 <button
                     onClick={() => initiateCall(selectedUser, "voice")}
                     className="p-2 rounded-full hover:bg-gray-700/50 text-gray-400 hover:text-white transition-colors"
                 >
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>
                 </button>
+                )}
 
                 {/* Video Call Button */}
+                {!selectedUser?.isAi && (
                 <button
                     onClick={() => initiateCall(selectedUser, "video")}
                     className="p-2 rounded-full hover:bg-gray-700/50 text-gray-400 hover:text-white transition-colors mr-2"
                 >
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
                 </button>
+                )}
 
                 <img src={assets.help_icon} alt="" className='max-md:hidden max-w-5' />
             </div>
@@ -150,7 +192,7 @@ const ChatContainer = () => {
                 onScroll={handleScroll}
                 className='flex-1 overflow-y-scroll p-3 pb-6 flex flex-col'
             >
-                {hasMore && (
+                {hasMore && !selectedUser?.isAi && (
                     <p className='text-center text-xs text-violet-400/70 py-2 font-medium shrink-0'>
                         {isLoadingMore ? "Loading chat history..." : "Scroll up to load older messages"}
                     </p>
@@ -166,13 +208,13 @@ const ChatContainer = () => {
                             {msg.image ? (
                                 <img src={msg.image} alt="" className='max-w-[230px] border border-gray-700 rounded-lg overflow-hidden mb-8' />
                             ) : (
-                                <p className={`p-2 max-w-[200px] md:text-sm font-light rounded-lg mb-8 break-all bg-violet-500/30 text-white ${msg.senderId === authUser._id ? 'rounded-br-none' : 'rounded-bl-none'}`}>{msg.text}</p>
+                                <p className={`p-2 max-w-[80%] md:text-sm font-light rounded-lg mb-8 break-words whitespace-pre-wrap ${msg.senderId === authUser._id ? 'bg-violet-600 text-white rounded-br-none' : 'bg-gray-700 text-gray-100 rounded-bl-none'}`}>{msg.text}</p>
                             )}
                             <div className="text-center text-xs shrink-0">
                                 <img src={msg.senderId === authUser._id ? authUser?.profilePic || assets.avatar_icon : selectedUser?.profilePic || assets.avatar_icon} alt="" className='w-7 rounded-full' />
                                 <p className='text-gray-500'>{formatMessageTime(msg.createdAt)}</p>
 
-                                {msg.senderId === authUser._id && clickedMessages && (
+                                {msg.senderId === authUser._id && clickedMessages && !selectedUser?.isAi && (
                                     <span className={`text-[10px] ${msg.seen ? 'text-violet-400' : 'text-gray-500'}`}>
                                         {msg.seen ? "Seen" : "Sent"}
                                     </span>
@@ -205,7 +247,7 @@ const ChatContainer = () => {
                         value={input}
                         onKeyDown={(e) => e.key === "Enter" ? handleSendMessage(e) : null}
                         type="text"
-                        placeholder="Send a message"
+                        placeholder={selectedUser?.isAi ? "Ask Orry AI anything or type /image..." : "Send a message"}
                         className='flex-1 text-sm p-3 border-none rounded-lg outline-none text-white placeholder-gray-400'
                     />
                     <input onChange={handleSendImage} type="file" id='image' accept='image/png, image/jpeg' hidden />

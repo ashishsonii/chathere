@@ -199,8 +199,47 @@ export const ChatProvider = ({ children })=>{
         return () => unsubscribeFromTyping();
     }, [socket]);
 
+    const subscribeToAiResponses = () => {
+        if (!socket) return;
+
+        socket.on("aiResponse", (response) => {
+            // Turn off Orry AI typing indicator
+            setTypingStatus((prev) => ({ ...prev, orry_ai: false }));
+
+            if (response.success) {
+                const newMessage = {
+                    _id: Date.now(),
+                    senderId: "orry_ai",
+                    text: response.type === "text" ? response.data : "",
+                    image: response.type === "image" ? response.data : null,
+                    createdAt: new Date()
+                };
+                setMessages((prev) => [...prev, newMessage]);
+            } else {
+                toast.error(response.error || "Failed to get AI response");
+                const errorMessage = {
+                    _id: Date.now(),
+                    senderId: "orry_ai",
+                    text: response.data || "Sorry, I couldn't process that request.",
+                    createdAt: new Date()
+                };
+                setMessages((prev) => [...prev, errorMessage]);
+            }
+        });
+    };
+
+    const unsubscribeFromAiResponses = () => {
+        if (socket) socket.off("aiResponse");
+    };
+
+    useEffect(() => {
+        subscribeToAiResponses();
+        return () => unsubscribeFromAiResponses();
+    }, [socket]);
+
     const value = {
         messages, 
+        setMessages,
         conversations, 
         selectedUser, 
         getUsers, 
@@ -208,6 +247,7 @@ export const ChatProvider = ({ children })=>{
         sendMessage, 
         setSelectedUser, 
         typingStatus,
+        setTypingStatus,
         searchUsers,
         hasMore,
         loadMoreMessages,
