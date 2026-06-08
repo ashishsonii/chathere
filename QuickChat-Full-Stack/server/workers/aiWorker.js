@@ -4,6 +4,7 @@ import Groq from "groq-sdk";
 import Message from "../models/Message.js";
 import User from "../models/User.js";
 import Conversation from "../models/Conversation.js";
+import mongoose from "mongoose";
 
 export const initWorker = (io) => {
   const connection = new Redis(process.env.REDIS_URL, {
@@ -32,21 +33,23 @@ export const initWorker = (io) => {
         const orry = await User.findOne({ email: "orry@quickchat.ai" });
         if (!orry) throw new Error("Orry AI user not found in DB");
 
+        const userObjectId = new mongoose.Types.ObjectId(userId);
+
         // Find or create Conversation
         let conversation = await Conversation.findOne({
-            participants: { $all: [userId, orry._id] }
+            participants: { $all: [userObjectId, orry._id] }
         });
 
         if (!conversation) {
             conversation = await Conversation.create({
-                participants: [userId, orry._id]
+                participants: [userObjectId, orry._id]
             });
         }
 
         // Save User's Prompt to DB
         const userMsg = await Message.create({
             conversationId: conversation._id,
-            senderId: userId,
+            senderId: userObjectId,
             receiverId: orry._id,
             text: type === "vision" ? "Uploaded an image" : prompt,
             image: image || null
@@ -62,7 +65,7 @@ export const initWorker = (io) => {
            const aiImgMsg = await Message.create({
                conversationId: conversation._id,
                senderId: orry._id,
-               receiverId: userId,
+               receiverId: userObjectId,
                image: imageUrl,
                text: "Here is your generated image!"
            });
@@ -107,7 +110,7 @@ export const initWorker = (io) => {
           const aiMsg = await Message.create({
               conversationId: conversation._id,
               senderId: orry._id,
-              receiverId: userId,
+              receiverId: userObjectId,
               text: aiText
           });
 
@@ -135,7 +138,7 @@ export const initWorker = (io) => {
         const aiMsgText = await Message.create({
             conversationId: conversation._id,
             senderId: orry._id,
-            receiverId: userId,
+            receiverId: userObjectId,
             text: responseText
         });
 
