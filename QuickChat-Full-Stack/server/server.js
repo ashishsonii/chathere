@@ -7,6 +7,8 @@ import http from "http";
 import { connectDB } from "./lib/db.js";
 import userRouter from "./routes/userRoutes.js";
 import messageRouter from "./routes/messageRoutes.js";
+import User from "./models/User.js";
+import bcrypt from "bcryptjs";
 import callRoutes from "./routes/callRoutes.js";
 import aiRoutes from "./routes/aiRoutes.js";
 import { Server } from "socket.io";
@@ -120,6 +122,28 @@ app.use("/api/ai", aiRoutes);
 
 // Connect to MongoDB
 await connectDB();
+
+const initOrryAI = async () => {
+    try {
+        const orry = await User.findOne({ email: "orry@quickchat.ai" });
+        if (!orry) {
+            const hashedPassword = await bcrypt.hash(Math.random().toString(36), 10);
+            await User.create({
+                email: "orry@quickchat.ai",
+                fullName: "Orry AI",
+                password: hashedPassword,
+                bio: "I am Orry AI, your friendly virtual assistant! I can help you answer questions, analyze images, and generate pictures! (Messages auto-delete in 48 hours)",
+                profilePic: "" 
+            });
+            console.log("Orry AI user created in DB!");
+        } else {
+            console.log("Orry AI user already exists:", orry._id);
+        }
+    } catch (err) {
+        console.error("Failed to init Orry AI:", err);
+    }
+};
+await initOrryAI();
 
 if (process.env.VERCEL !== "1") {
     const PORT = process.env.PORT || 5000;

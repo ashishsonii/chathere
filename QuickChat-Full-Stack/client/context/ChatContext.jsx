@@ -134,6 +134,23 @@ export const ChatProvider = ({ children })=>{
         }
     }
 
+    // function to clear conversation
+    const clearConversation = async () => {
+        if (!selectedUser) return;
+        try {
+            const { data } = await axios.delete(`/api/messages/clear/${selectedUser._id}`);
+            if (data.success) {
+                toast.success("Chat cleared!");
+                setMessages([]);
+                getUsers(); // Refresh sidebar
+            } else {
+                toast.error(data.message);
+            }
+        } catch (error) {
+            toast.error(error.message);
+        }
+    };
+
     // function to subscribe to new messages for selected user
     const subscribeToMessages = async () =>{
         if(!socket) return;
@@ -162,11 +179,19 @@ export const ChatProvider = ({ children })=>{
                 return [updatedConv, ...filtered];
             });
         });
+
+        socket.on("conversationCleared", ({ conversationId }) => {
+            setMessages([]);
+            getUsers();
+        });
     };
 
     // function to unsubscribe from conversation updates
     const unsubscribeFromConversationUpdates = () => {
-        if (socket) socket.off("conversationUpdate");
+        if (socket) {
+            socket.off("conversationUpdate");
+            socket.off("conversationCleared");
+        }
     };
 
     // subscribe/unsubscribe on component lifecycle
@@ -204,12 +229,14 @@ export const ChatProvider = ({ children })=>{
 
         socket.on("aiResponse", (response) => {
             // Turn off Orry AI typing indicator
-            setTypingStatus((prev) => ({ ...prev, orry_ai: false }));
+            if (selectedUser) {
+                setTypingStatus((prev) => ({ ...prev, [selectedUser._id]: false }));
+            }
 
             if (response.success) {
-                const newMessage = {
+                const newMessage = response.dbMessage || {
                     _id: Date.now(),
-                    senderId: "orry_ai",
+                    senderId: selectedUser?._id,
                     text: response.type === "text" ? response.data : "",
                     image: response.type === "image" ? response.data : null,
                     createdAt: new Date()
@@ -219,7 +246,7 @@ export const ChatProvider = ({ children })=>{
                 toast.error(response.error || "Failed to get AI response");
                 const errorMessage = {
                     _id: Date.now(),
-                    senderId: "orry_ai",
+                    senderId: selectedUser?._id,
                     text: response.data || "Sorry, I couldn't process that request.",
                     createdAt: new Date()
                 };
@@ -251,7 +278,8 @@ export const ChatProvider = ({ children })=>{
         searchUsers,
         hasMore,
         loadMoreMessages,
-        friends
+        friends,
+        clearConversation
     }
 
     return (

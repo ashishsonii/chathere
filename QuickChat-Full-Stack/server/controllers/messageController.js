@@ -272,3 +272,39 @@ export const getFriends = async (req, res) => {
         res.json({ success: false, message: error.message });
     }
 };
+
+// Delete all messages in a conversation
+export const clearConversation = async (req, res) => {
+    try {
+        const { id: otherUserId } = req.params;
+        const myId = req.user._id;
+
+        const conv = await Conversation.findOne({
+            participants: { $all: [myId, otherUserId] }
+        });
+
+        if (!conv) {
+            return res.json({ success: false, message: "Conversation not found" });
+        }
+
+        await Message.deleteMany({ conversationId: conv._id });
+
+        // Reset last message and unread count
+        conv.lastMessage = null;
+        if (conv.unreadMessages) {
+            conv.unreadMessages.set(myId.toString(), 0);
+            conv.unreadMessages.set(otherUserId.toString(), 0);
+        }
+        await conv.save();
+
+        // Notify both users to clear their UI
+        [myId, otherUserId].forEach(pId => {
+            io.to(pId.toString()).emit("conversationCleared", { conversationId: conv._id });
+        });
+
+        res.json({ success: true, message: "Conversation cleared successfully" });
+    } catch (error) {
+        console.log("Clear Conversation Error:", error.message);
+        res.json({ success: false, message: error.message });
+    }
+};

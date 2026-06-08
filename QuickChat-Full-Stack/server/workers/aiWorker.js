@@ -1,6 +1,9 @@
 import { Worker } from "bullmq";
 import Redis from "ioredis";
 import Groq from "groq-sdk";
+import Message from "../models/Message.js";
+import User from "../models/User.js";
+import Conversation from "../models/Conversation.js";
 
 export const initWorker = (io) => {
   const connection = new Redis(process.env.REDIS_URL, {
@@ -22,10 +25,32 @@ export const initWorker = (io) => {
   const aiWorker = new Worker(
     "ai-tasks-queue",
     async (job) => {
-      const { prompt, userId, type } = job.data;
+      const { prompt, userId, type, image } = job.data;
       console.log(`Processing AI Task for User ${userId}`);
 
       try {
+        const orry = await User.findOne({ email: "orry@quickchat.ai" });
+        if (!orry) throw new Error("Orry AI user not found in DB");
+
+        // Find or create Conversation
+        let conversation = await Conversation.findOne({
+            participants: { $all: [userId, orry._id] }
+        });
+
+        if (!conversation) {
+            conversation = await Conversation.create({
+                participants: [userId, orry._id]
+            });
+        }
+
+        // Save User's Prompt to DB
+        const userMsg = await Message.create({
+            conversationId: conversation._id,
+            senderId: userId,
+            receiverId: orry._id,
+            text: type === "vision" ? "Uploaded an image" : prompt,
+            image: image || null
+        });
         if (type === "image") {
            // Extract prompt after /image if present
            const promptCleaned = prompt.replace(/^\/image/i, "").trim() || "A highly detailed, ultra-realistic masterpiece, 8k resolution";
@@ -34,10 +59,19 @@ export const initWorker = (io) => {
            // Simulate slight processing delay for realism
            await new Promise(r => setTimeout(r, 2000));
 
+           const aiImgMsg = await Message.create({
+               conversationId: conversation._id,
+               senderId: orry._id,
+               receiverId: userId,
+               image: imageUrl,
+               text: "Here is your generated image!"
+           });
+
            io.to(userId.toString()).emit("aiResponse", {
               success: true,
               type: "image",
-              data: imageUrl
+              data: imageUrl,
+              dbMessage: aiImgMsg
            });
            return { success: true };
         }
@@ -52,22 +86,65 @@ export const initWorker = (io) => {
            return { success: false, error: "Missing GROQ_API_KEY" };
         }
 
+        if (type === "vision") {
+          const chatCompletion = await groq.chat.completions.create({
+            messages: [
+              {
+                role: "user",
+                content: [
+                  { type: "text", text: "Briefly describe this image in a fun and concise way." },
+                  { type: "image_url", image_url: { url: image } }
+                ]
+              }
+            ],
+            model: "llama-3.2-11b-vision-preview",
+            temperature: 0.7,
+            max_tokens: 100
+          });
+
+          const aiText = chatCompletion.choices[0]?.message?.content || "Wow! Nice picture!";
+          
+          const aiMsg = await Message.create({
+              conversationId: conversation._id,
+              senderId: orry._id,
+              receiverId: userId,
+              text: aiText
+          });
+
+          io.to(userId.toString()).emit("aiResponse", {
+            success: true,
+            type: "text",
+            data: aiText,
+            dbMessage: aiMsg
+          });
+          return { success: true };
+        }
+
         const chatCompletion = await groq.chat.completions.create({
           messages: [
-            { role: "system", content: "You are Orry AI, a helpful AI Assistant integrated into QuickChat. Keep responses concise and engaging." },
+            { role: "system", content: "You are Orry AI. Keep your answers extremely short, clean, and concise. Do not use markdown unless necessary." },
             { role: "user", content: prompt }
           ],
           model: "llama-3.1-8b-instant",
           temperature: 0.7,
+          max_tokens: 150
         });
 
         const responseText = chatCompletion.choices[0]?.message?.content || "No response generated.";
+
+        const aiMsgText = await Message.create({
+            conversationId: conversation._id,
+            senderId: orry._id,
+            receiverId: userId,
+            text: responseText
+        });
 
         // Emit back to the user via Socket.io
         io.to(userId.toString()).emit("aiResponse", {
           success: true,
           type: "text",
-          data: responseText
+          data: responseText,
+          dbMessage: aiMsgText
         });
 
         return { success: true };

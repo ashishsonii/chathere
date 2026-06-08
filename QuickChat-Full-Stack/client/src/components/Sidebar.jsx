@@ -24,6 +24,7 @@ const Sidebar = () => {
     const [isSearching, setIsSearching] = useState(false)
     const [activeTab, setActiveTab] = useState("chats"); // "chats" or "calls"
     const [isMenuOpen, setIsMenuOpen] = useState(false);
+    const [orryAiUser, setOrryAiUser] = useState(null);
 
     const navigate = useNavigate();
 
@@ -31,6 +32,15 @@ const Sidebar = () => {
     useEffect(() => {
         if (authUser) {
             getUsers();
+            
+            // Fetch Orry AI permanently
+            const fetchOrry = async () => {
+                const results = await searchUsers("orry@quickchat.ai");
+                if (results && results.length > 0) {
+                    setOrryAiUser({ ...results[0], isAi: true });
+                }
+            };
+            fetchOrry();
         }
     }, [onlineUsers, authUser]);
 
@@ -153,13 +163,12 @@ const Sidebar = () => {
                                 <p className='text-xs text-gray-400 px-3 py-1 font-semibold uppercase tracking-wider'>Recent Chats</p>
                                 
                                 {/* Orry AI Permanent Contact */}
+                                {orryAiUser && (
                                 <div 
-                                    onClick={() => setSelectedUser({ _id: "orry_ai", fullName: "Orry AI", isAi: true })}
-                                    className={`relative flex items-center gap-2 p-2 pl-4 rounded cursor-pointer max-sm:text-sm transition-all hover:bg-[#282142]/20 mb-1 border border-indigo-500/30 bg-gradient-to-r from-blue-500/10 to-indigo-600/10 shadow-sm`}
+                                    onClick={() => setSelectedUser(orryAiUser)}
+                                    className={`relative flex items-center gap-2 p-2 pl-4 rounded cursor-pointer max-sm:text-sm transition-all ${selectedUser?._id === orryAiUser._id ? 'bg-[#282142]/50 border-l-4 border-indigo-500' : 'hover:bg-[#282142]/20'} mb-1 border border-indigo-500/30 bg-gradient-to-r from-blue-500/10 to-indigo-600/10 shadow-sm`}
                                 >
-                                    <div className="w-[35px] h-[35px] rounded-full flex items-center justify-center bg-gradient-to-br from-blue-500 to-indigo-600 shadow-md">
-                                        <Bot size={20} className="text-white animate-pulse" />
-                                    </div>
+                                    <img src={assets.orry_avatar} alt="Orry AI" className="w-[35px] h-[35px] rounded-full object-cover border-2 border-indigo-500 shadow-md" />
                                     <div className='flex flex-col leading-5 flex-1 min-w-0'>
                                         <div className='flex justify-between items-center gap-2'>
                                             <p className='truncate font-medium text-white'>Orry AI</p>
@@ -170,6 +179,7 @@ const Sidebar = () => {
                                         </p>
                                     </div>
                                 </div>
+                                )}
 
                                 {conversations.length > 0 ? (
                                     conversations.map((conv, index) => {
