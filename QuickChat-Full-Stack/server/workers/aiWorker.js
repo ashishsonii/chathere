@@ -55,8 +55,26 @@ export const initWorker = (io) => {
             image: image || null
         });
         if (type === "image") {
+           // 1. Send instant text response
+           const instantMsg = await Message.create({
+               conversationId: conversation._id,
+               senderId: orry._id,
+               receiverId: userObjectId,
+               text: "I'm generating your image now... 🎨"
+           });
+           
+           io.to(userId.toString()).emit("aiResponse", {
+               success: true,
+               type: "text",
+               data: "I'm generating your image now... 🎨",
+               dbMessage: instantMsg
+           });
+
+           // 2. Generate and send image after a slight delay
            const promptCleaned = prompt.replace(/^\/image/i, "").trim() || "A masterpiece painting";
            const imageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(promptCleaned)}?width=512&height=512&nologo=true`;
+
+           await new Promise(r => setTimeout(r, 1500)); // Short delay so text is read first
 
            const aiImgMsg = await Message.create({
                conversationId: conversation._id,
