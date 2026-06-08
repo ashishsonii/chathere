@@ -22,6 +22,8 @@ import pic4 from './pic4.png'
 import img1 from './img1.jpg'
 import img2 from './img2.jpg'
 
+const orry_avatar = "/orry_avatar.png"; // Will load from public folder if user adds it
+
 const assets = {
     avatar_icon,
     gallery_icon,
@@ -35,7 +37,8 @@ const assets = {
     arrow_icon,
     code,
     bgImage,
-    profile_martin
+    profile_martin,
+    orry_avatar
 }
 
 export default assets;
