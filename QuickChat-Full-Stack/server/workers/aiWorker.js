@@ -57,7 +57,8 @@ export const initWorker = (io) => {
             { role: "system", content: "You are Orry AI, a helpful AI Assistant integrated into QuickChat. Keep responses concise and engaging." },
             { role: "user", content: prompt }
           ],
-          model: "llama3-8b-8192",
+          model: "llama-3.1-8b-instant",
+          temperature: 0.7,
         });
 
         const responseText = chatCompletion.choices[0]?.message?.content || "No response generated.";
