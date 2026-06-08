@@ -55,12 +55,8 @@ export const initWorker = (io) => {
             image: image || null
         });
         if (type === "image") {
-           // Extract prompt after /image if present
-           const promptCleaned = prompt.replace(/^\/image/i, "").trim() || "A highly detailed, ultra-realistic masterpiece, 8k resolution";
-           const imageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(promptCleaned)}?width=1024&height=1024&nologo=true`;
-
-           // Simulate slight processing delay for realism
-           await new Promise(r => setTimeout(r, 2000));
+           const promptCleaned = prompt.replace(/^\/image/i, "").trim() || "A masterpiece painting";
+           const imageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(promptCleaned)}?width=512&height=512&nologo=true`;
 
            const aiImgMsg = await Message.create({
                conversationId: conversation._id,
