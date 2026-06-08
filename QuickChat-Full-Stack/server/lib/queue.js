@@ -11,3 +11,4 @@ connection.on("error", (err) => {
 });
 
 export const aiQueue = new Queue("ai-tasks-queue", { connection });
+export const cleanupQueue = new Queue("cleanup-tasks-queue", { connection });

@@ -145,6 +145,19 @@ const initOrryAI = async () => {
 };
 await initOrryAI();
 
+import Message from "./models/Message.js";
+try {
+    await Message.collection.dropIndex("createdAt_1");
+    console.log("Dropped legacy TTL index on Messages.");
+} catch (error) {
+    if (error.code !== 27) { // 27 = IndexNotFound
+        console.error("Error dropping TTL index:", error);
+    }
+}
+
+// Initialize workers
+import "./workers/cleanupWorker.js";
+
 if (process.env.VERCEL !== "1") {
     const PORT = process.env.PORT || 5000;
     server.listen(PORT, ()=> console.log("Server is running on PORT: " + PORT));
