@@ -182,7 +182,12 @@ const Sidebar = () => {
                                 )}
 
                                 {conversations.length > 0 ? (
-                                    conversations.map((conv, index) => {
+                                    conversations
+                                      .filter(conv => {
+                                          const other = conv.participants.find(p => p._id !== authUser?._id) || authUser;
+                                          return other?.email !== "orry@quickchat.ai";
+                                      })
+                                      .map((conv, index) => {
                                         const otherParticipant = conv.participants.find(p => p._id !== authUser?._id) || authUser;
                                         if (!otherParticipant) return null;
                                         
