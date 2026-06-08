@@ -229,7 +229,9 @@ export const ChatProvider = ({ children })=>{
 
         socket.on("aiResponse", (response) => {
             // Turn off Orry AI typing indicator
-            if (selectedUser) {
+            if (response.senderId) {
+                setTypingStatus((prev) => ({ ...prev, [response.senderId]: false }));
+            } else if (selectedUser) {
                 setTypingStatus((prev) => ({ ...prev, [selectedUser._id]: false }));
             }
 

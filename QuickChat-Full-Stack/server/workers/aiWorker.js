@@ -132,14 +132,31 @@ export const initWorker = (io) => {
             success: true,
             type: "text",
             data: aiText,
-            dbMessage: aiMsg
+            dbMessage: aiMsg,
+            senderId: orry._id
           });
           return { success: true };
         }
 
+        // Fetch recent conversation history
+        const recentMessages = await Message.find({ conversationId: conversation._id })
+            .sort({ createdAt: -1 })
+            .limit(10);
+            
+        // Convert to chronological order
+        recentMessages.reverse();
+
+        const historyContext = recentMessages
+            .filter(msg => msg.text && msg.text !== "I'm generating your image now... 🎨") // skip system-like messages
+            .map(msg => ({
+                role: msg.senderId.toString() === orry._id.toString() ? "assistant" : "user",
+                content: msg.text
+            }));
+
         const chatCompletion = await groq.chat.completions.create({
           messages: [
             { role: "system", content: "You are Orry AI. Keep your answers extremely short, clean, and concise. Do not use markdown unless necessary." },
+            ...historyContext,
             { role: "user", content: prompt }
           ],
           model: "llama-3.1-8b-instant",
@@ -156,22 +173,22 @@ export const initWorker = (io) => {
             text: responseText
         });
 
-        // Emit back to the user via Socket.io
         io.to(userId.toString()).emit("aiResponse", {
           success: true,
           type: "text",
           data: responseText,
-          dbMessage: aiMsgText
+          dbMessage: aiMsgText,
+          senderId: orry._id
         });
 
         return { success: true };
       } catch (error) {
-        console.error("AI Worker Error:", error);
         io.to(userId.toString()).emit("aiResponse", {
           success: false,
           error: "Failed to generate AI response",
           type: "text",
-          data: "An error occurred while trying to process your request."
+          data: "An error occurred while trying to process your request.",
+          senderId: "orry" // generic fallback to clear typing
         });
         throw error;
       }
