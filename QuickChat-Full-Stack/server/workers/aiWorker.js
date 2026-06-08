@@ -67,7 +67,8 @@ export const initWorker = (io) => {
                success: true,
                type: "text",
                data: "I'm generating your image now... 🎨",
-               dbMessage: instantMsg
+               dbMessage: instantMsg,
+               senderId: orry._id
            });
 
            // 2. Generate and send image after a slight delay
@@ -88,7 +89,8 @@ export const initWorker = (io) => {
               success: true,
               type: "image",
               data: imageUrl,
-              dbMessage: aiImgMsg
+              dbMessage: aiImgMsg,
+              senderId: orry._id
            });
            return { success: true };
         }
@@ -98,7 +100,8 @@ export const initWorker = (io) => {
               success: false,
               error: "AI is currently disabled due to missing configuration on the server.",
               type: "text",
-              data: "Sorry, my text brain is currently disconnected!"
+              data: "Sorry, my text brain is currently disconnected!",
+              senderId: orry._id
            });
            return { success: false, error: "Missing GROQ_API_KEY" };
         }
