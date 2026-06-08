@@ -7,8 +7,17 @@ export const initWorker = (io) => {
     maxRetriesPerRequest: null,
   });
 
-  // Initialize Groq API Client
-  const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
+  // Initialize Groq API Client safely
+  let groq = null;
+  if (process.env.GROQ_API_KEY) {
+    try {
+      groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
+    } catch (e) {
+      console.error("Failed to initialize Groq API:", e.message);
+    }
+  } else {
+    console.warn("WARNING: GROQ_API_KEY is not set. Text AI features will fail gracefully.");
+  }
 
   const aiWorker = new Worker(
     "ai-tasks-queue",
@@ -31,6 +40,16 @@ export const initWorker = (io) => {
               data: imageUrl
            });
            return { success: true };
+        }
+
+        if (!groq) {
+           io.to(userId.toString()).emit("aiResponse", {
+              success: false,
+              error: "AI is currently disabled due to missing configuration on the server.",
+              type: "text",
+              data: "Sorry, my text brain is currently disconnected!"
+           });
+           return { success: false, error: "Missing GROQ_API_KEY" };
         }
 
         const chatCompletion = await groq.chat.completions.create({
