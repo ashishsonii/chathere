@@ -8,9 +8,6 @@ export const protectRoute = async (req, res, next) => {
     const token = req.headers.token;
 
     if (!token) {
-      // ✅ Add CORS headers even when rejecting
-      res.setHeader("Access-Control-Allow-Origin", "https://orry.vercel.app");
-      res.setHeader("Access-Control-Allow-Credentials", "true");
       return res
         .status(401)
         .json({ success: false, message: "No token provided" });
@@ -34,8 +31,6 @@ export const protectRoute = async (req, res, next) => {
     }
 
     if (!user) {
-      res.setHeader("Access-Control-Allow-Origin", "https://orry.vercel.app");
-      res.setHeader("Access-Control-Allow-Credentials", "true");
       return res
         .status(404)
         .json({ success: false, message: "User not found" });
@@ -44,12 +39,9 @@ export const protectRoute = async (req, res, next) => {
     req.user = user;
     next();
   } catch (error) {
-    console.log(error.message);
-    // ✅ Add headers on error responses too
-    res.setHeader("Access-Control-Allow-Origin", "https://orry.vercel.app");
-    res.setHeader("Access-Control-Allow-Credentials", "true");
+    console.log("Auth Middleware Error:", error.message);
     return res
       .status(401)
-      .json({ success: false, message: "Invalid or expired token" });
+      .json({ success: false, message: "Auth failed: " + error.message });
   }
 };

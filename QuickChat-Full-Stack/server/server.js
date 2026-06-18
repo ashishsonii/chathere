@@ -102,6 +102,7 @@ app.use(cors({
     "https://chatbyashish.duckdns.org"
   ],
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization", "token"],
   credentials: true
 }));
 
