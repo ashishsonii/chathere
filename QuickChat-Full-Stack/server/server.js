@@ -13,16 +13,16 @@ import callRoutes from "./routes/callRoutes.js";
 import aiRoutes from "./routes/aiRoutes.js";
 import { Server } from "socket.io";
 import { runMigration } from "./lib/migrate.js";
-import redis from "./lib/redis.js";
+// import redis from "./lib/redis.js";
 import { setupCallSignaling, handleCallDisconnect } from "./services/callSignaling.js";
-import { initWorker } from "./workers/aiWorker.js";
+// import { initWorker } from "./workers/aiWorker.js";
 
 // Create Express app and HTTP server
 const app = express();
 const server = http.createServer(app)
 
-import { createAdapter } from "@socket.io/redis-adapter";
-import Redis from "ioredis";
+// import { createAdapter } from "@socket.io/redis-adapter";
+// import Redis from "ioredis";
 
 // Initialize socket.io server
 export const io = new Server(server, {
@@ -37,19 +37,20 @@ export const io = new Server(server, {
 });
 
 // Configure Redis adapter for Socket.io clustering
-const pubClient = new Redis(process.env.REDIS_URL);
-const subClient = new Redis(process.env.REDIS_URL);
+// const pubClient = new Redis(process.env.REDIS_URL);
+// const subClient = new Redis(process.env.REDIS_URL);
 
-pubClient.on("error", (err) => console.error("Socket.io Redis PubClient Error:", err.message));
-subClient.on("error", (err) => console.error("Socket.io Redis SubClient Error:", err.message));
+// pubClient.on("error", (err) => console.error("Socket.io Redis PubClient Error:", err.message));
+// subClient.on("error", (err) => console.error("Socket.io Redis SubClient Error:", err.message));
 
-io.adapter(createAdapter(pubClient, subClient));
+// io.adapter(createAdapter(pubClient, subClient));
 
 // Initialize BullMQ AI Worker
-initWorker(io);
+// initWorker(io);
 
-// Store online users
+// Store online users locally for hotfix
 export const userSocketMap = {}; // { userId: socketId }
+export const onlineUsersSet = new Set(); // Stores userIds
 
 // Socket.io connection handler
 io.on("connection", async (socket)=>{
@@ -59,15 +60,14 @@ io.on("connection", async (socket)=>{
     if(userId) {
         socket.join(userId.toString());
         userSocketMap[userId] = socket.id;
-        await redis.sadd("online_users", userId);
+        onlineUsersSet.add(userId.toString());
     }
     
     // Setup WebRTC Call Signaling
     setupCallSignaling(io, socket, userSocketMap);
     
-    // Fetch and broadcast online users from Redis Set
-    const onlineUsers = await redis.smembers("online_users");
-    io.emit("getOnlineUsers", onlineUsers);
+    // Fetch and broadcast online users from Local Set
+    io.emit("getOnlineUsers", Array.from(onlineUsersSet));
 
     socket.on("disconnect", async ()=>{
         console.log("User Disconnected", userId);
@@ -76,10 +76,9 @@ io.on("connection", async (socket)=>{
             await handleCallDisconnect(io, userId);
 
             delete userSocketMap[userId];
-            await redis.srem("online_users", userId);
+            onlineUsersSet.delete(userId.toString());
         }
-        const updatedOnlineUsers = await redis.smembers("online_users");
-        io.emit("getOnlineUsers", updatedOnlineUsers)
+        io.emit("getOnlineUsers", Array.from(onlineUsersSet));
     })
 
     // Typing event
@@ -157,7 +156,7 @@ try {
 }
 
 // Initialize workers
-import "./workers/cleanupWorker.js";
+// import "./workers/cleanupWorker.js";
 
 if (process.env.VERCEL !== "1") {
     const PORT = process.env.PORT || 5000;

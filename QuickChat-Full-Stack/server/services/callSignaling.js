@@ -1,23 +1,27 @@
 import crypto from "crypto";
-import redis from "../lib/redis.js";
+// import redis from "../lib/redis.js";
 import Call from "../models/Call.js";
+
+// In-memory call state for hotfix
+const activeCalls = new Map(); // callId -> callState
+const userCalls = new Map(); // userId -> callId
 
 // Helper to handle unexpected socket disconnections during an active call
 export const handleCallDisconnect = async (io, userId) => {
     try {
-        const callId = await redis.get(`call:user:${userId}`);
+        const callId = userCalls.get(userId.toString());
         if (!callId) return; // Not in a call
 
-        const stateStr = await redis.get(`call:active:${callId}`);
-        if (!stateStr) return;
+        const callStateStr = activeCalls.get(callId);
+        if (!callStateStr) return;
 
-        const callState = JSON.parse(stateStr);
+        const callState = JSON.parse(callStateStr);
         const otherUserId = callState.callerId === userId ? callState.receiverId : callState.callerId;
 
-        // Clean up Redis
-        await redis.del(`call:active:${callId}`);
-        await redis.del(`call:user:${callState.callerId}`);
-        await redis.del(`call:user:${callState.receiverId}`);
+        // Clean up Memory
+        activeCalls.delete(callId);
+        userCalls.delete(callState.callerId.toString());
+        userCalls.delete(callState.receiverId.toString());
 
         // Save dropped call to MongoDB
         await Call.create({
@@ -49,13 +53,14 @@ export const setupCallSignaling = (io, socket, userSocketMap) => {
     socket.on("call:initiate", async ({ receiverId, type }) => {
         try {
             // Check if receiver is online
-            const isOnline = await redis.sismember("online_users", receiverId);
+            // Since we're not using redis.sismember anymore, we check userSocketMap directly
+            const isOnline = !!userSocketMap[receiverId];
             if (!isOnline) {
                 return socket.emit("call:error", { message: "User is offline" });
             }
 
             // Check if receiver is already in a call
-            const receiverInCall = await redis.get(`call:user:${receiverId}`);
+            const receiverInCall = userCalls.get(receiverId.toString());
             if (receiverInCall) {
                 return socket.emit("call:error", { message: "User is busy on another call", reason: "busy" });
             }
@@ -63,7 +68,7 @@ export const setupCallSignaling = (io, socket, userSocketMap) => {
             // Create a unique Call ID
             const callId = crypto.randomUUID();
 
-            // Set call state in Redis (expires in 5 mins to prevent zombie calls)
+            // Set call state in Memory
             const callState = {
                 callId,
                 callerId: userId,
@@ -72,9 +77,9 @@ export const setupCallSignaling = (io, socket, userSocketMap) => {
                 status: "ringing",
                 startedAt: Date.now()
             };
-            await redis.setex(`call:active:${callId}`, 300, JSON.stringify(callState));
-            await redis.setex(`call:user:${userId}`, 300, callId);
-            await redis.setex(`call:user:${receiverId}`, 300, callId);
+            activeCalls.set(callId, JSON.stringify(callState));
+            userCalls.set(userId.toString(), callId);
+            userCalls.set(receiverId.toString(), callId);
 
             // Emit incoming call to receiver
             io.to(receiverId.toString()).emit("call:incoming", {
@@ -95,7 +100,7 @@ export const setupCallSignaling = (io, socket, userSocketMap) => {
     // 2. Accept a Call
     socket.on("call:accept", async ({ callId }) => {
         try {
-            const stateStr = await redis.get(`call:active:${callId}`);
+            const stateStr = activeCalls.get(callId);
             if (!stateStr) return socket.emit("call:error", { message: "Call expired or not found" });
 
             const callState = JSON.parse(stateStr);
@@ -103,7 +108,7 @@ export const setupCallSignaling = (io, socket, userSocketMap) => {
 
             callState.status = "answered";
             callState.answeredAt = Date.now();
-            await redis.setex(`call:active:${callId}`, 86400, JSON.stringify(callState)); // Extend TTL while active
+            activeCalls.set(callId, JSON.stringify(callState));
 
             io.to(callState.callerId.toString()).emit("call:accepted", { callId });
         } catch (error) {
@@ -114,15 +119,15 @@ export const setupCallSignaling = (io, socket, userSocketMap) => {
     // 3. Reject a Call
     socket.on("call:reject", async ({ callId }) => {
         try {
-            const stateStr = await redis.get(`call:active:${callId}`);
+            const stateStr = activeCalls.get(callId);
             if (!stateStr) return;
 
             const callState = JSON.parse(stateStr);
             
-            // Clean up Redis
-            await redis.del(`call:active:${callId}`);
-            await redis.del(`call:user:${callState.callerId}`);
-            await redis.del(`call:user:${callState.receiverId}`);
+            // Clean up Memory
+            activeCalls.delete(callId);
+            userCalls.delete(callState.callerId.toString());
+            userCalls.delete(callState.receiverId.toString());
 
             // Save to MongoDB
             await Call.create({
@@ -144,7 +149,7 @@ export const setupCallSignaling = (io, socket, userSocketMap) => {
     // 4. End a Call (by either party)
     socket.on("call:end", async ({ callId, duration, quality }) => {
         try {
-            const stateStr = await redis.get(`call:active:${callId}`);
+            const stateStr = activeCalls.get(callId);
             if (!stateStr) return; // Already ended
 
             const callState = JSON.parse(stateStr);
@@ -152,10 +157,10 @@ export const setupCallSignaling = (io, socket, userSocketMap) => {
             // Determine the other user
             const otherUserId = callState.callerId === userId ? callState.receiverId : callState.callerId;
 
-            // Clean up Redis
-            await redis.del(`call:active:${callId}`);
-            await redis.del(`call:user:${callState.callerId}`);
-            await redis.del(`call:user:${callState.receiverId}`);
+            // Clean up Memory
+            activeCalls.delete(callId);
+            userCalls.delete(callState.callerId.toString());
+            userCalls.delete(callState.receiverId.toString());
 
             // Save to MongoDB
             await Call.create({

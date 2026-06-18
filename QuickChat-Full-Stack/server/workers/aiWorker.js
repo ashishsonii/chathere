@@ -1,35 +1,28 @@
-import { Worker } from "bullmq";
-import Redis from "ioredis";
+// import { Worker } from "bullmq";
+// import Redis from "ioredis";
 import Groq from "groq-sdk";
 import Message from "../models/Message.js";
 import User from "../models/User.js";
 import Conversation from "../models/Conversation.js";
 import mongoose from "mongoose";
 
-export const initWorker = (io) => {
-  const connection = new Redis(process.env.REDIS_URL, {
-    maxRetriesPerRequest: null,
-  });
-
-  // Initialize Groq API Client safely
-  let groq = null;
-  if (process.env.GROQ_API_KEY) {
-    try {
-      groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
-    } catch (e) {
-      console.error("Failed to initialize Groq API:", e.message);
-    }
-  } else {
-    console.warn("WARNING: GROQ_API_KEY is not set. Text AI features will fail gracefully.");
+// Initialize Groq API Client safely
+let groq = null;
+if (process.env.GROQ_API_KEY) {
+  try {
+    groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
+  } catch (e) {
+    console.error("Failed to initialize Groq API:", e.message);
   }
+} else {
+  console.warn("WARNING: GROQ_API_KEY is not set. Text AI features will fail gracefully.");
+}
 
-  const aiWorker = new Worker(
-    "ai-tasks-queue",
-    async (job) => {
-      const { prompt, userId, type, image } = job.data;
-      console.log(`Processing AI Task for User ${userId}`);
+export const processAiTask = async (data, io) => {
+    const { prompt, userId, type, image } = data;
+    console.log(`Processing AI Task for User ${userId} (Inline Mode)`);
 
-      try {
+    try {
         const orry = await User.findOne({ email: "orry@quickchat.ai" });
         if (!orry) throw new Error("Orry AI user not found in DB");
 
@@ -185,7 +178,8 @@ export const initWorker = (io) => {
         });
 
         return { success: true };
-      } catch (error) {
+    } catch (error) {
+        console.error("Inline AI Worker Error:", error);
         io.to(userId.toString()).emit("aiResponse", {
           success: false,
           error: "Failed to generate AI response",
@@ -194,18 +188,5 @@ export const initWorker = (io) => {
           senderId: "orry" // generic fallback to clear typing
         });
         throw error;
-      }
-    },
-    { connection }
-  );
-
-  aiWorker.on("completed", (job) => {
-    console.log(`AI Job ${job.id} has completed!`);
-  });
-
-  aiWorker.on("failed", (job, err) => {
-    console.error(`AI Job ${job.id} has failed with ${err.message}`);
-  });
-
-  return aiWorker;
+    }
 };

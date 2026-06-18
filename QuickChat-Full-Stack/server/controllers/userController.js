@@ -1,7 +1,6 @@
 import { generateToken } from "../lib/utils.js";
 import User from "../models/User.js";
 import bcrypt from "bcryptjs";
-import redis from "../lib/redis.js";
 import { uploadToS3, signUser } from "../lib/s3.js";
 
 // Signup a new user
@@ -78,8 +77,8 @@ export const updateProfile = async (req, res)=>{
             updatedUser = await User.findByIdAndUpdate(userId, {profilePic: uploadUrl, bio, fullName}, {new: true});
         }
 
-        // Invalidate Redis profile cache to avoid serving stale profile data
-        await redis.del(`user:profile:${userId}`);
+        // Redis profile caching is temporarily disabled for hotfix
+        // await redis.del(`user:profile:${userId}`);
 
         const signedUser = await signUser(updatedUser);
         res.json({success: true, user: signedUser})
